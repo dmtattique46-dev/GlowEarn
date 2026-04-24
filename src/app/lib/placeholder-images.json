@@ -1,0 +1,23 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "gold-avatar",
+      "description": "Golden circular avatar",
+      "imageUrl": "https://picsum.photos/seed/gold-avatar/200/200",
+      "imageHint": "gold avatar"
+    },
+    {
+      "id": "coin-bg",
+      "description": "Floating gold coin",
+      "imageUrl": "https://picsum.photos/seed/coin/100/100",
+      "imageHint": "gold coin"
+    },
+    {
+      "id": "gear-bg",
+      "description": "Golden gear element",
+      "imageUrl": "https://picsum.photos/seed/gear/100/100",
+      "imageHint": "gold gear"
+    }
+  ]
+}
