@@ -28,9 +28,9 @@ export function Header() {
         <div className="glass-box p-2.5 px-4 rounded-2xl flex flex-col items-end gap-0.5">
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-glowearn-gold shadow-[0_0_5px_#fadb3b]"></div>
-            <span className="text-white font-black text-xs">$12.50 USD</span>
+            <span className="text-white font-black text-xs">$20.00 USD</span>
           </div>
-          <span className="text-glowearn-gold font-bold text-[10px] uppercase tracking-wider">12,500 Coins</span>
+          <span className="text-glowearn-gold font-bold text-[10px] uppercase tracking-wider">1,000,000 Coins</span>
         </div>
       </div>
     </header>

@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useMemo } from 'react';
@@ -40,7 +39,7 @@ const BitcoinLogo = () => (
 );
 
 export default function WalletPage() {
-  const [coins, setCoins] = useState<string>("85,000");
+  const [coins, setCoins] = useState<string>("1,000,000");
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
 
   const withdrawalMethods = [
@@ -72,9 +71,9 @@ export default function WalletPage() {
         <section className="w-full text-center space-y-1 mt-4">
           <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Balance Summary</h3>
           <div className="space-y-0.5">
-            <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">12,500</span></h2>
+            <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">1,000,000</span></h2>
             <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-              USD VALUE: <span className="italic">$0.25</span>
+              USD VALUE: <span className="italic">$20.00</span>
             </h1>
           </div>
         </section>

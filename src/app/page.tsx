@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from 'react';
@@ -55,7 +54,7 @@ export default function Home() {
                 <DollarSign className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Earnings</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">$1,240.50</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">$20.00</span>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-glowearn-gold/20 backdrop-blur-md rounded-2xl overflow-hidden">
@@ -64,7 +63,7 @@ export default function Home() {
                 <TrendingUp className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Rank</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">#12</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">#1</span>
             </CardContent>
           </Card>
         </div>

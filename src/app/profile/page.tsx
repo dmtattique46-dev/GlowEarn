@@ -7,8 +7,7 @@ import { FloatingElements } from '@/components/background/FloatingElements';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Puzzle, LogOut, ChevronRight, Star } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Sparkles, Puzzle, LogOut, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
@@ -20,21 +19,8 @@ export default function ProfilePage() {
     { label: "Weekly Challenge:", progress: 66, current: 2, total: 3 },
   ];
 
-  const badges = [
-    { 
-      title: "Puzzle Badge", 
-      desc: "Clear over 100 near puzzle themes puzzle formends.",
-      icon: Puzzle,
-    },
-    { 
-      title: "Puzzle Badge", 
-      desc: "Complete only the puzzle from top is emoircon badges.",
-      icon: Puzzle,
-    }
-  ];
-
   const stats = [
-    { label: "Total Points:", value: "75,000" },
+    { label: "Total Points:", value: "1,000,000" },
     { label: "Best Line Clear:", value: "2 Lines" },
     { label: "Games Played:", value: "250" },
   ];
@@ -69,37 +55,44 @@ export default function ProfilePage() {
 
         {/* Achievements Card */}
         <section>
-          <Card className="bg-[#0c2436]/80 rounded-[2.5rem] overflow-hidden backdrop-blur-xl neon-gold-border">
+          <Card className="bg-[#0c2436]/80 rounded-[2.5rem] overflow-hidden backdrop-blur-xl neon-gold-border shadow-[0_0_30px_rgba(250,219,59,0.4)]">
             <CardContent className="p-8 space-y-6">
               <h3 className="text-glowearn-gold font-headline font-black text-lg text-center uppercase tracking-widest border-b border-glowearn-gold/10 pb-4">
                 ACHIEVEMENTS
               </h3>
               
               <div className="space-y-4">
-                <h4 className="text-glowearn-gold/80 font-bold text-xs">Daily Goals</h4>
+                <h4 className="text-glowearn-gold/80 font-bold text-xs uppercase tracking-widest">Daily Goals</h4>
                 {dailyGoals.map((goal, i) => (
                   <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold uppercase">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
                       <span className="text-white/60">{goal.label}</span>
-                      <span className="text-white">{goal.current}/{goal.total}]</span>
+                      <span className="text-white">{goal.current}/{goal.total}</span>
                     </div>
-                    <Progress value={goal.progress} className="h-3 bg-white/5" />
+                    <Progress value={goal.progress} className="h-2.5 bg-white/5" />
                   </div>
                 ))}
               </div>
 
               <div className="space-y-4 pt-4 border-t border-white/5">
-                {badges.map((badge, i) => (
-                  <div key={i} className="flex gap-4 items-center">
-                    <div className="bg-glowearn-gold/20 p-3 rounded-2xl border border-glowearn-gold/40 shadow-[0_0_10px_rgba(250,219,59,0.2)]">
-                      <badge.icon className="text-glowearn-gold" size={24} />
-                    </div>
-                    <div>
-                      <h5 className="text-glowearn-gold font-black text-[12px] uppercase tracking-tight">{badge.title}</h5>
-                      <p className="text-white/50 text-[10px] leading-relaxed mt-0.5">{badge.desc}</p>
-                    </div>
+                <div className="flex gap-4 items-center">
+                  <div className="bg-glowearn-gold/20 p-3 rounded-2xl border border-glowearn-gold/40 shadow-[0_0_15px_rgba(250,219,59,0.2)]">
+                    <Puzzle className="text-glowearn-gold" size={24} />
                   </div>
-                ))}
+                  <div>
+                    <h5 className="text-glowearn-gold font-black text-[12px] uppercase tracking-tight">Master Puzzler Badge</h5>
+                    <p className="text-white/50 text-[10px] leading-relaxed mt-0.5">Top tier badge for expert line clears.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 items-center">
+                  <div className="bg-glowearn-gold/20 p-3 rounded-2xl border border-glowearn-gold/40 shadow-[0_0_15px_rgba(250,219,59,0.2)]">
+                    <Sparkles className="text-glowearn-gold" size={24} />
+                  </div>
+                  <div>
+                    <h5 className="text-glowearn-gold font-black text-[12px] uppercase tracking-tight">Glow Specialist</h5>
+                    <p className="text-white/50 text-[10px] leading-relaxed mt-0.5">Unlocked for high engagement.</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -116,7 +109,7 @@ export default function ProfilePage() {
                 {stats.map((stat, i) => (
                   <div key={i} className="flex justify-between items-center border-b border-white/5 pb-4 last:border-0 last:pb-0">
                     <span className="text-white/60 font-bold text-xs uppercase tracking-wide">{stat.label}</span>
-                    <span className="font-black text-lg text-glowearn-gold">{stat.value}</span>
+                    <span className="font-black text-xl text-glowearn-gold italic">{stat.value}</span>
                   </div>
                 ))}
               </div>
@@ -133,7 +126,7 @@ export default function ProfilePage() {
             <div className="p-3 rounded-2xl bg-red-500/10 text-red-500 group-hover:bg-red-500/20">
               <LogOut size={20} />
             </div>
-            <span className="text-red-500 font-bold text-sm tracking-wide">Logout Account</span>
+            <span className="text-red-500 font-bold text-sm tracking-wide uppercase">Logout Account</span>
           </div>
           <ChevronRight size={18} className="text-red-500/20" />
         </button>
