@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 
 // Official-style logos as inline SVG components for precision and premium styling
 const BinanceLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_20px_rgba(243,186,47,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(243,186,47,0.6)]">
+  <div className="w-14 h-14 rounded-full bg-black/80 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_20px_rgba(243,186,47,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(243,186,47,0.6)]">
     <svg viewBox="0 0 24 24" className="w-9 h-9 fill-[#F3BA2F]">
       <path d="M16.624 13.9202L12 18.5442L7.376 13.9202L5.992 15.3042L12 21.3122L18.008 15.3042L16.624 13.9202Z" />
       <path d="M12 15.1522L8.848 12.0002L12 8.8482L15.152 12.0002L12 15.1522Z" />
@@ -23,18 +23,19 @@ const BinanceLogo = () => (
 );
 
 const JazzCashLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center border border-red-500/40 shadow-[0_0_20px_rgba(237,28,36,0.3)] transition-all group-hover:shadow-[0_0_30px_rgba(237,28,36,0.5)] overflow-hidden">
-    <svg viewBox="0 0 100 100" className="w-10 h-10">
-      {/* Recreating the JazzCash 'X' style logo from the image */}
-      <path d="M35 20 C20 30 20 70 35 80 C45 70 45 30 35 20" fill="#FADB3B" />
-      <path d="M65 20 C80 30 80 70 65 80 C55 70 55 30 65 20" fill="#ED1C24" />
-      <path d="M45 40 L55 60 M55 40 L45 60" stroke="#ED1C24" strokeWidth="4" strokeLinecap="round" />
-    </svg>
+  <div className="w-14 h-14 rounded-full bg-black/80 flex items-center justify-center border border-red-500/40 shadow-[0_0_20px_rgba(237,28,36,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(237,28,36,0.6)] relative overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-[#ED1C24] to-[#FADB3B] opacity-20"></div>
+    <div className="relative flex items-center justify-center">
+      <span className="text-white font-black text-xl italic tracking-tighter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">JC</span>
+      {/* Decorative curves to mimic the official sphere look */}
+      <div className="absolute -left-1 w-6 h-6 border-l-2 border-[#FADB3B] rounded-full opacity-40"></div>
+      <div className="absolute -right-1 w-6 h-6 border-r-2 border-[#ED1C24] rounded-full opacity-40"></div>
+    </div>
   </div>
 );
 
 const BitcoinLogo = () => (
-  <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center border border-orange-500/40 shadow-[0_0_20px_rgba(247,147,26,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(247,147,26,0.6)]">
+  <div className="w-14 h-14 rounded-full bg-black/80 flex items-center justify-center border border-orange-500/40 shadow-[0_0_20px_rgba(247,147,26,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(247,147,26,0.6)]">
     <svg viewBox="0 0 24 24" className="w-9 h-9 fill-[#F7931A]">
       <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.556.358 9.126 1.96 2.696 8.472-1.213 14.9.392c6.435 1.602 10.342 8.113 8.738 14.512zm-4.145-5.915c.315-2.106-1.29-3.24-3.48-3.99l.713-2.856-1.738-.433-.695 2.785c-.456-.113-.923-.22-1.387-.325l.7-2.813-1.738-.433-.713 2.856c-.378-.087-.75-.175-1.11-.267l.002-.012-2.397-.598-.462 1.856s1.29.295 1.263.313c.704.176.83.645.81.1017l-.81 3.255c.048.012.11.03.18.057l-.183-.045-1.135 4.557c-.086.212-.305.531-.797.408.018.027-1.263-.315-1.263-.315l-.862 1.987 2.26.564c.42.105.83.213 1.232.315l-.72 2.888 1.737.433.713-2.856c.475.13.935.25 1.382.366l-.713 2.856 1.738.433.72-2.897c2.964.56 5.192.334 6.13-2.345.755-2.157-.037-3.402-1.597-4.212 1.135-.262 1.99-.101 2.226-2.584zm-3.977 5.64c-.538 2.16-4.184 1-5.367.705l.958-3.84c1.183.295 4.965.875 4.41 3.135zm.54-5.67c-.49 1.965-3.53.967-4.516.72l.87-3.484c.985.245 4.148.7 3.646 2.764z" />
     </svg>
@@ -86,7 +87,7 @@ export default function WalletPage() {
             <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
             
             <div className="relative flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
-              <div className="bg-glowearn-gold/20 p-1.5 rounded-full">
+              <div className="bg-glowearn-gold/20 p-1.5 rounded-full flex items-center justify-center">
                 <BitcoinLogo />
               </div>
               <input 
