@@ -11,26 +11,31 @@ import { cn } from '@/lib/utils';
 
 // Official-style logos as inline SVG components for precision and premium styling
 const BinanceLogo = () => (
-  <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center border border-yellow-500/30 shadow-[0_0_15px_rgba(243,186,47,0.4)] transition-all group-hover:shadow-[0_0_25px_rgba(243,186,47,0.6)]">
-    <svg viewBox="0 0 24 24" className="w-8 h-8 fill-[#F3BA2F]">
-      <path d="M12 3L9.06 5.94L12 8.88L14.94 5.94L12 3ZM18.06 9L15.12 11.94L18.06 14.88L21 11.94L18.06 9ZM12 15.12L9.06 18.06L12 21L14.94 18.06L12 15.12ZM5.94 9L3 11.94L5.94 14.88L8.88 11.94L5.94 9ZM12 9.06L9.06 12L12 14.94L14.94 12L12 9.06Z" />
+  <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_20px_rgba(243,186,47,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(243,186,47,0.6)]">
+    <svg viewBox="0 0 24 24" className="w-9 h-9 fill-[#F3BA2F]">
+      <path d="M16.624 13.9202L12 18.5442L7.376 13.9202L5.992 15.3042L12 21.3122L18.008 15.3042L16.624 13.9202Z" />
+      <path d="M12 15.1522L8.848 12.0002L12 8.8482L15.152 12.0002L12 15.1522Z" />
+      <path d="M7.376 10.0802L12 5.45617L16.624 10.0802L18.008 8.69617L12 2.68817L5.992 8.69617L7.376 10.0802Z" />
+      <path d="M2.688 12.0002L5.456 9.23217L8.224 12.0002L5.456 14.7682L2.688 12.0002Z" />
+      <path d="M15.776 12.0002L18.544 9.23217L21.312 12.0002L18.544 14.7682L15.776 12.0002Z" />
     </svg>
   </div>
 );
 
 const JazzCashLogo = () => (
-  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border border-red-500/30 shadow-[0_0_15px_rgba(237,28,36,0.4)] transition-all group-hover:shadow-[0_0_25px_rgba(237,28,36,0.6)] overflow-hidden">
-    <svg viewBox="0 0 100 100" className="w-9 h-9">
-      <rect width="100" height="100" fill="#FFD700" />
-      <path d="M25 25 H45 V55 Q45 70 30 70 H15 V55 H30 V25 Z" fill="#ED1C24" />
-      <path d="M55 70 H80 V55 H60 V45 H80 V30 H60 V20 H55 V70 Z" fill="#ED1C24" />
+  <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center border border-red-500/40 shadow-[0_0_20px_rgba(237,28,36,0.3)] transition-all group-hover:shadow-[0_0_30px_rgba(237,28,36,0.5)] overflow-hidden">
+    <svg viewBox="0 0 100 100" className="w-10 h-10">
+      {/* Recreating the JazzCash 'X' style logo from the image */}
+      <path d="M35 20 C20 30 20 70 35 80 C45 70 45 30 35 20" fill="#FADB3B" />
+      <path d="M65 20 C80 30 80 70 65 80 C55 70 55 30 65 20" fill="#ED1C24" />
+      <path d="M45 40 L55 60 M55 40 L45 60" stroke="#ED1C24" strokeWidth="4" strokeLinecap="round" />
     </svg>
   </div>
 );
 
 const BitcoinLogo = () => (
-  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border border-orange-500/30 shadow-[0_0_15px_rgba(247,147,26,0.4)] transition-all group-hover:shadow-[0_0_25px_rgba(247,147,26,0.6)]">
-    <svg viewBox="0 0 24 24" className="w-8 h-8 fill-[#F7931A]">
+  <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center border border-orange-500/40 shadow-[0_0_20px_rgba(247,147,26,0.4)] transition-all group-hover:shadow-[0_0_30px_rgba(247,147,26,0.6)]">
+    <svg viewBox="0 0 24 24" className="w-9 h-9 fill-[#F7931A]">
       <path d="M23.638 14.904c-1.602 6.43-8.113 10.34-14.542 8.736C2.67 22.05-1.244 15.556.358 9.126 1.96 2.696 8.472-1.213 14.9.392c6.435 1.602 10.342 8.113 8.738 14.512zm-4.145-5.915c.315-2.106-1.29-3.24-3.48-3.99l.713-2.856-1.738-.433-.695 2.785c-.456-.113-.923-.22-1.387-.325l.7-2.813-1.738-.433-.713 2.856c-.378-.087-.75-.175-1.11-.267l.002-.012-2.397-.598-.462 1.856s1.29.295 1.263.313c.704.176.83.645.81.1017l-.81 3.255c.048.012.11.03.18.057l-.183-.045-1.135 4.557c-.086.212-.305.531-.797.408.018.027-1.263-.315-1.263-.315l-.862 1.987 2.26.564c.42.105.83.213 1.232.315l-.72 2.888 1.737.433.713-2.856c.475.13.935.25 1.382.366l-.713 2.856 1.738.433.72-2.897c2.964.56 5.192.334 6.13-2.345.755-2.157-.037-3.402-1.597-4.212 1.135-.262 1.99-.101 2.226-2.584zm-3.977 5.64c-.538 2.16-4.184 1-5.367.705l.958-3.84c1.183.295 4.965.875 4.41 3.135zm.54-5.67c-.49 1.965-3.53.967-4.516.72l.87-3.484c.985.245 4.148.7 3.646 2.764z" />
     </svg>
   </div>
@@ -131,16 +136,16 @@ export default function WalletPage() {
                   key={method.name}
                   onClick={() => setSelectedMethod(method.name)}
                   className={cn(
-                    "flex flex-col items-center p-4 rounded-2xl border transition-all duration-300 backdrop-blur-sm group",
+                    "flex flex-col items-center p-4 rounded-2xl border transition-all duration-300 backdrop-blur-sm group h-36",
                     isSelected 
-                      ? "bg-glowearn-gold/10 border-glowearn-gold/80 shadow-[0_0_15px_#fadb3b33]" 
-                      : "bg-[#0c2436]/60 border-white/5 opacity-50 grayscale hover:grayscale-0 hover:opacity-100"
+                      ? "bg-glowearn-gold/15 border-glowearn-gold/80 shadow-[0_0_20px_#fadb3b44]" 
+                      : "bg-[#0c2436]/80 border-white/10 opacity-60 grayscale-[0.5] hover:grayscale-0 hover:opacity-100"
                   )}
                 >
                   <div className="mb-4">
                     <method.Logo />
                   </div>
-                  <span className={cn("text-[10px] font-black uppercase", isSelected ? "text-white" : "text-white/40")}>
+                  <span className={cn("text-[10px] font-black uppercase mt-auto", isSelected ? "text-white" : "text-white/40")}>
                     {method.name}
                   </span>
                   <span className="text-[7px] text-white/30 uppercase font-bold text-center leading-tight">{method.label}</span>
