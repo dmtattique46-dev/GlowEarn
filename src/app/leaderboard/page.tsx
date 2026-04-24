@@ -6,111 +6,117 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Star } from 'lucide-react';
+import { Crown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LeaderboardPage() {
   const topUsers = [
-    { rank: 1, name: "GoldenEagle", earnings: "$12,450", avatar: "1" },
-    { rank: 2, name: "MidasTouch", earnings: "$10,200", avatar: "2" },
-    { rank: 3, name: "GlowKing", earnings: "$8,900", avatar: "3" },
-    { rank: 4, name: "SurveyPro", earnings: "$7,500", avatar: "4" },
-    { rank: 5, name: "CashMagnet", earnings: "$6,800", avatar: "5" },
-    { rank: 6, name: "ProfitMaster", earnings: "$5,400", avatar: "6" },
+    { rank: 1, name: "SpinPro22", earnings: "1,500,000", avatarSeed: "spin" },
+    { rank: 2, name: "GameQueen", earnings: "1,250,000", avatarSeed: "queen" },
+    { rank: 3, name: "CoinHunter", earnings: "950,000", avatarSeed: "hunter" },
+    { rank: 4, name: "CoinHunter", earnings: "700,000", avatarSeed: "c4" },
+    { rank: 5, name: "GameQueen", earnings: "600,000", avatarSeed: "g5" },
+    { rank: 6, name: "User1233", earnings: "450,000", avatarSeed: "u6" },
+    { rank: 7, name: "Ballabavis", earnings: "380,000", avatarSeed: "b7" },
+    { rank: 8, name: "User123", earnings: "310,000", avatarSeed: "u8" },
+    { rank: 9, name: "GameQueen", earnings: "200,000", avatarSeed: "g9" },
+    { rank: 10, name: "User123", earnings: "90,000", avatarSeed: "u10" },
   ];
 
   return (
-    <div className="relative min-h-screen pb-24 pt-20">
+    <div className="relative min-h-screen pb-24 pt-20 bg-[#081926]">
       <FloatingElements />
       <Header />
       
-      <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-8">
-        <header className="mt-4 text-center">
-          <h2 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-xs">The Glow Hall of Fame</h2>
-          <h1 className="text-white font-headline text-4xl font-black mt-2 italic">LEADERBOARD</h1>
+      <main className="relative z-10 px-4 max-w-2xl mx-auto space-y-6">
+        <header className="mt-8 text-center">
+          <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
+            LEADERBOARD
+          </h1>
         </header>
 
-        {/* Podium */}
-        <div className="flex items-end justify-center gap-4 mt-12 mb-8">
-          {/* 2nd Place */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-16 w-16 border-2 border-slate-400">
-                <AvatarImage src={`https://picsum.photos/seed/user2/200/200`} />
-                <AvatarFallback>U2</AvatarFallback>
-              </Avatar>
-              <div className="absolute -top-2 -right-2 bg-slate-400 rounded-full p-1 text-glowearn-navy">
-                <Medal size={16} />
-              </div>
+        {/* Glowing Leaderboard Card */}
+        <section className="neon-gold-border bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md mb-8">
+          <div className="p-4 sm:p-6">
+            {/* Table Header */}
+            <div className="grid grid-cols-[1fr_2fr_1.5fr] px-4 py-2 border-b border-white/5 mb-2">
+              <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider">Rank</span>
+              <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider">Username</span>
+              <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider text-right">Total Coins</span>
             </div>
-            <div className="h-24 w-20 bg-slate-400/20 border-t-2 border-slate-400 rounded-t-xl flex flex-col items-center justify-center">
-              <span className="text-slate-400 font-black text-xl">2</span>
-              <span className="text-white/40 text-[10px] font-bold uppercase">Rank</span>
-            </div>
-          </div>
 
-          {/* 1st Place */}
-          <div className="flex flex-col items-center gap-3 scale-110">
-            <div className="relative">
-              <Avatar className="h-20 w-20 border-4 border-glowearn-gold shadow-[0_0_20px_rgba(250,219,59,0.5)]">
-                <AvatarImage src={`https://picsum.photos/seed/user1/200/200`} />
-                <AvatarFallback>U1</AvatarFallback>
-              </Avatar>
-              <div className="absolute -top-3 -right-3 bg-glowearn-gold rounded-full p-1.5 text-glowearn-navy animate-bounce">
-                <Trophy size={20} />
-              </div>
-            </div>
-            <div className="h-32 w-24 bg-glowearn-gold/20 border-t-4 border-glowearn-gold rounded-t-xl flex flex-col items-center justify-center">
-              <span className="text-glowearn-gold font-black text-3xl">1</span>
-              <span className="text-white/40 text-[10px] font-bold uppercase">Rank</span>
-            </div>
-          </div>
+            {/* List */}
+            <div className="space-y-1">
+              {topUsers.map((user) => {
+                const isTop3 = user.rank <= 3;
+                const isRank1 = user.rank === 1;
 
-          {/* 3rd Place */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-16 w-16 border-2 border-orange-700">
-                <AvatarImage src={`https://picsum.photos/seed/user3/200/200`} />
-                <AvatarFallback>U3</AvatarFallback>
-              </Avatar>
-              <div className="absolute -top-2 -right-2 bg-orange-700 rounded-full p-1 text-glowearn-navy">
-                <Medal size={16} />
-              </div>
-            </div>
-            <div className="h-20 w-20 bg-orange-700/20 border-t-2 border-orange-700 rounded-t-xl flex flex-col items-center justify-center">
-              <span className="text-orange-700 font-black text-xl">3</span>
-              <span className="text-white/40 text-[10px] font-bold uppercase">Rank</span>
-            </div>
-          </div>
-        </div>
+                return (
+                  <div 
+                    key={user.rank} 
+                    className={cn(
+                      "grid grid-cols-[1fr_2fr_1.5fr] items-center px-4 py-3 rounded-2xl transition-all relative",
+                      isRank1 && "bg-glowearn-gold/10 border border-glowearn-gold/30",
+                      isTop3 && !isRank1 && "bg-white/5"
+                    )}
+                  >
+                    {/* Rank Column */}
+                    <div className="flex flex-col items-start relative">
+                      {isTop3 && (
+                        <div className="absolute -top-4 left-1 text-glowearn-gold">
+                          <Crown size={14} className="fill-glowearn-gold" />
+                        </div>
+                      )}
+                      {isRank1 && (
+                        <div className="absolute -left-2 top-0 text-glowearn-gold/40 animate-pulse">
+                          <Sparkles size={16} />
+                        </div>
+                      )}
+                      <span className={cn(
+                        "font-black italic text-lg leading-none",
+                        isTop3 ? "text-glowearn-gold" : "text-white/30"
+                      )}>
+                        {user.rank}
+                      </span>
+                    </div>
 
-        {/* List View */}
-        <section className="bg-white/5 rounded-[2rem] border border-white/5 overflow-hidden">
-          {topUsers.slice(3).map((user, idx) => (
-            <div 
-              key={idx} 
-              className={cn(
-                "flex items-center justify-between p-5 transition-colors hover:bg-white/5",
-                idx !== topUsers.slice(3).length - 1 && "border-b border-white/5"
-              )}
-            >
-              <div className="flex items-center gap-4">
-                <span className="text-white/30 font-black italic w-6">{user.rank}</span>
-                <Avatar className="h-10 w-10 border border-glowearn-gold/20">
-                  <AvatarImage src={`https://picsum.photos/seed/list${idx}/200/200`} />
-                  <AvatarFallback>{user.name[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h4 className="text-white font-bold text-sm">{user.name}</h4>
-                  <div className="flex items-center gap-1">
-                    <Star size={10} className="text-glowearn-gold fill-glowearn-gold" />
-                    <span className="text-white/40 text-[10px] uppercase font-bold">Elite Earner</span>
+                    {/* Username Column */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className={cn(
+                        "h-8 w-8",
+                        isTop3 ? "border border-glowearn-gold/50" : "border border-white/10"
+                      )}>
+                        <AvatarImage src={`https://picsum.photos/seed/${user.avatarSeed}/200/200`} />
+                        <AvatarFallback>{user.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className={cn(
+                        "text-sm font-bold truncate",
+                        isTop3 ? "text-white" : "text-white/70"
+                      )}>
+                        {user.name}
+                      </span>
+                    </div>
+
+                    {/* Coins Column */}
+                    <div className="text-right flex flex-col">
+                      <span className={cn(
+                        "font-black text-sm",
+                        isTop3 ? "text-glowearn-gold" : "text-white/80"
+                      )}>
+                        {user.earnings}
+                      </span>
+                      <span className="text-[9px] text-white/40 uppercase font-bold tracking-tighter">Coins</span>
+                      {isRank1 && (
+                        <div className="absolute right-2 top-2 text-glowearn-gold/40">
+                          <Sparkles size={12} />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
-              <span className="text-glowearn-gold font-black text-lg">{user.earnings}</span>
+                );
+              })}
             </div>
-          ))}
+          </div>
         </section>
       </main>
 
