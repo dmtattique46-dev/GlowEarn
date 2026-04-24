@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
@@ -12,59 +12,129 @@ import { cn } from '@/lib/utils';
 const GRID_ROWS = 8;
 const GRID_COLS = 6;
 
-type BlockColor = 'red' | 'green' | 'blue' | 'purple' | 'orange' | 'yellow' | null;
+type BlockColor = 'red' | 'green' | 'blue' | 'purple' | 'orange' | 'yellow';
+
+interface Shape {
+  id: string;
+  color: BlockColor;
+  blocks: [number, number][]; // Relative coordinates [row, col]
+}
+
+const PRESET_SHAPES: Omit<Shape, 'id'>[] = [
+  { color: 'red', blocks: [[0, 0], [1, 0], [1, 1]] }, // L small
+  { color: 'orange', blocks: [[0, 0], [0, 1], [0, 2], [1, 1]] }, // T shape
+  { color: 'yellow', blocks: [[0, 0], [0, 1], [1, 0], [1, 1]] }, // Square
+  { color: 'blue', blocks: [[0, 0], [1, 0], [2, 0]] }, // I shape
+  { color: 'purple', blocks: [[0, 0], [0, 1], [0, 2]] }, // Horizontal I
+  { color: 'green', blocks: [[0, 0]] }, // Single dot
+];
 
 export default function EarnPage() {
-  const [grid, setGrid] = useState<BlockColor[][]>(
+  const [grid, setGrid] = useState<(BlockColor | null)[][]>(
     Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null))
   );
+  const [shelf, setShelf] = useState<(Shape | null)[]>([]);
+  const [selectedShapeIdx, setSelectedShapeIdx] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [showClear, setShowClear] = useState(false);
-  const [lastClearRow, setLastClearRow] = useState<number | null>(null);
+  const [coins, setCoins] = useState(12500);
 
-  // Initial dummy state to match image
-  useEffect(() => {
-    const newGrid = [...grid];
-    // Top blocks
-    newGrid[0][0] = 'red'; newGrid[0][1] = 'green';
-    newGrid[1][0] = 'red'; newGrid[1][1] = 'green';
-    
-    // Bottom blocks
-    newGrid[4][0] = 'blue'; newGrid[4][1] = 'blue'; newGrid[4][2] = 'purple'; newGrid[4][3] = 'purple';
-    newGrid[5][0] = 'blue'; newGrid[5][1] = 'blue'; newGrid[5][2] = 'purple'; newGrid[5][3] = 'purple';
-    newGrid[5][4] = 'green';
-    newGrid[6][0] = 'red'; newGrid[6][1] = 'red'; newGrid[6][2] = 'red'; newGrid[6][3] = 'red'; newGrid[6][4] = 'green'; newGrid[6][5] = 'orange';
-    newGrid[7][0] = 'red'; newGrid[7][1] = 'orange'; newGrid[7][2] = 'orange'; newGrid[7][3] = 'yellow'; newGrid[7][4] = 'yellow'; newGrid[7][5] = 'blue';
-    
-    setGrid(newGrid);
+  // Initialize shelf
+  const refillShelf = useCallback(() => {
+    const newShelf = Array(3).fill(null).map(() => ({
+      ...PRESET_SHAPES[Math.floor(Math.random() * PRESET_SHAPES.length)],
+      id: Math.random().toString(36).substr(2, 9),
+    })) as Shape[];
+    setShelf(newShelf);
   }, []);
 
-  const handlePlaceBlock = () => {
-    // Simulate a line clear for demonstration
-    setLastClearRow(3);
-    setShowClear(true);
-    setScore(prev => prev + 100);
-    setTimeout(() => setShowClear(false), 2000);
+  useEffect(() => {
+    refillShelf();
+    // Initial dummy blocks for aesthetic match
+    const newGrid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
+    newGrid[7][0] = 'red'; newGrid[7][1] = 'orange'; newGrid[7][2] = 'orange';
+    setGrid(newGrid);
+  }, [refillShelf]);
+
+  const checkAndClearLines = (currentGrid: (BlockColor | null)[][]) => {
+    let linesCleared = 0;
+    const rowsToClear: number[] = [];
+    const colsToClear: number[] = [];
+
+    // Check Rows
+    for (let r = 0; r < GRID_ROWS; r++) {
+      if (currentGrid[r].every(cell => cell !== null)) {
+        rowsToClear.push(r);
+      }
+    }
+
+    // Check Cols
+    for (let c = 0; c < GRID_COLS; c++) {
+      let isFull = true;
+      for (let r = 0; r < GRID_ROWS; r++) {
+        if (currentGrid[r][c] === null) {
+          isFull = false;
+          break;
+        }
+      }
+      if (isFull) colsToClear.push(c);
+    }
+
+    if (rowsToClear.length > 0 || colsToClear.length > 0) {
+      const newGrid = currentGrid.map(row => [...row]);
+      rowsToClear.forEach(r => newGrid[r].fill(null));
+      colsToClear.forEach(c => {
+        for (let r = 0; r < GRID_ROWS; r++) newGrid[r][c] = null;
+      });
+
+      setGrid(newGrid);
+      linesCleared = rowsToClear.length + colsToClear.length;
+      setShowClear(true);
+      setScore(prev => prev + (linesCleared * 100));
+      setCoins(prev => prev + (linesCleared * 100));
+      setTimeout(() => setShowClear(false), 2000);
+    }
+  };
+
+  const handlePlaceBlock = (row: number, col: number) => {
+    if (selectedShapeIdx === null || !shelf[selectedShapeIdx]) return;
+
+    const shape = shelf[selectedShapeIdx]!;
+    const newGrid = grid.map(r => [...r]);
+
+    // Validate placement
+    const canPlace = shape.blocks.every(([dr, dc]) => {
+      const nr = row + dr;
+      const nc = col + dc;
+      return (
+        nr >= 0 && nr < GRID_ROWS &&
+        nc >= 0 && nc < GRID_COLS &&
+        newGrid[nr][nc] === null
+      );
+    });
+
+    if (canPlace) {
+      shape.blocks.forEach(([dr, dc]) => {
+        newGrid[row + dr][col + dc] = shape.color;
+      });
+
+      setGrid(newGrid);
+      const newShelf = [...shelf];
+      newShelf[selectedShapeIdx] = null;
+      setShelf(newShelf);
+      setSelectedShapeIdx(null);
+
+      // Check if shelf is empty to refill
+      if (newShelf.every(s => s === null)) {
+        refillShelf();
+      }
+
+      checkAndClearLines(newGrid);
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-20 overflow-hidden">
-      {/* Background Decorative Elements */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute bottom-10 left-4 text-glowearn-gold/40 rotate-12">
-          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="animate-[spin_20s_linear_infinite]">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </div>
-        <div className="absolute bottom-32 right-6 text-glowearn-gold/30 -rotate-45">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="animate-[spin_15s_linear_infinite_reverse]">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </div>
-      </div>
-      
       <FloatingElements />
       <Header />
       
@@ -81,7 +151,7 @@ export default function EarnPage() {
           </div>
         </div>
 
-        {/* Game Board Container */}
+        {/* Game Board */}
         <div className="relative p-2 rounded-3xl bg-blue-900/20 border-[3px] border-blue-500/40 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
           <div className="grid grid-cols-6 gap-1 bg-glowearn-navy/80 p-1 rounded-xl">
             {grid.map((row, rIdx) => (
@@ -89,9 +159,10 @@ export default function EarnPage() {
                 {row.map((cell, cIdx) => (
                   <div 
                     key={`${rIdx}-${cIdx}`}
+                    onClick={() => handlePlaceBlock(rIdx, cIdx)}
                     className={cn(
-                      "w-12 h-12 rounded-lg transition-all duration-300 relative overflow-hidden",
-                      cell ? getBlockStyle(cell) : "bg-white/5 border border-white/5 shadow-inner"
+                      "w-12 h-12 rounded-lg transition-all duration-300 relative overflow-hidden cursor-pointer",
+                      cell ? getBlockStyle(cell) : "bg-white/5 border border-white/5 shadow-inner hover:bg-white/10"
                     )}
                   >
                     {cell && (
@@ -124,53 +195,47 @@ export default function EarnPage() {
 
         {/* Interaction Shelf */}
         <div className="mt-10 w-full flex flex-col items-center">
-          <div className="relative w-full h-16 bg-blue-400/30 rounded-t-[2rem] border-t-2 border-blue-300/40 flex items-center justify-around px-4">
-            {/* Shape 1 */}
-            <div className="flex flex-col gap-0.5 cursor-pointer hover:scale-110 transition-transform">
-              <div className="flex gap-0.5">
-                <div className="w-4 h-4 bg-red-600 rounded-sm border border-red-400 shadow-md"></div>
-                <div className="w-4 h-4 bg-red-600 rounded-sm border border-red-400 shadow-md"></div>
+          <div className="relative w-full h-24 bg-blue-400/20 rounded-t-[2.5rem] border-t-2 border-blue-300/40 flex items-center justify-around px-4">
+            {shelf.map((shape, idx) => (
+              <div 
+                key={shape?.id || `empty-${idx}`}
+                onClick={() => shape && setSelectedShapeIdx(idx)}
+                className={cn(
+                  "relative p-2 rounded-xl transition-all cursor-pointer group",
+                  selectedShapeIdx === idx ? "bg-glowearn-gold/20 scale-110 border border-glowearn-gold/40" : "hover:scale-105"
+                )}
+              >
+                {shape ? (
+                  <div className="grid grid-cols-3 grid-rows-2 gap-0.5">
+                    {/* Render minimal preview of shape */}
+                    {shape.blocks.map(([r, c], bIdx) => (
+                      <div 
+                        key={bIdx}
+                        style={{ gridRow: r + 1, gridColumn: c + 1 }}
+                        className={cn("w-3.5 h-3.5 rounded-sm border", getBlockStyle(shape.color))}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 border-2 border-dashed border-white/10 rounded-lg" />
+                )}
+                
+                {idx === 1 && !selectedShapeIdx && shape && (
+                  <div className="absolute -bottom-8 right-0 animate-bounce text-white pointer-events-none">
+                    <MousePointer2 size={24} className="rotate-[135deg] fill-white text-black" />
+                  </div>
+                )}
               </div>
-              <div className="flex justify-center">
-                <div className="w-4 h-4 bg-red-600 rounded-sm border border-red-400 shadow-md"></div>
-              </div>
-            </div>
-
-            {/* Shape 2 (Active/Target) */}
-            <div 
-              className="relative flex flex-col gap-0.5 cursor-pointer hover:scale-110 transition-transform"
-              onClick={handlePlaceBlock}
-            >
-              <div className="flex gap-0.5">
-                <div className="w-4 h-4 bg-orange-500 rounded-sm border border-orange-300 shadow-md"></div>
-              </div>
-              <div className="flex gap-0.5">
-                <div className="w-4 h-4 bg-orange-500 rounded-sm border border-orange-300 shadow-md"></div>
-                <div className="w-4 h-4 bg-orange-500 rounded-sm border border-orange-300 shadow-md"></div>
-                <div className="w-4 h-4 bg-orange-500 rounded-sm border border-orange-300 shadow-md"></div>
-              </div>
-              {/* Hand Icon Pointer */}
-              <div className="absolute -bottom-6 right-0 animate-bounce text-white">
-                <MousePointer2 size={28} className="rotate-[135deg] fill-white text-black" />
-              </div>
-            </div>
-
-            {/* Shape 3 */}
-            <div className="flex flex-col gap-0.5 cursor-pointer hover:scale-110 transition-transform">
-              <div className="flex gap-0.5">
-                <div className="w-4 h-4 bg-yellow-500 rounded-sm border border-yellow-300 shadow-md"></div>
-                <div className="w-4 h-4 bg-yellow-500 rounded-sm border border-yellow-300 shadow-md"></div>
-              </div>
-              <div className="flex gap-0.5">
-                <div className="w-4 h-4 bg-yellow-500 rounded-sm border border-yellow-300 shadow-md"></div>
-                <div className="w-4 h-4 bg-yellow-500 rounded-sm border border-yellow-300 shadow-md"></div>
-              </div>
-            </div>
+            ))}
           </div>
 
-          <p className="mt-8 text-blue-400/80 font-black text-sm uppercase tracking-widest animate-pulse">
-            TAP TO PLACE SHAPES
+          <p className="mt-8 text-blue-400/80 font-black text-xs uppercase tracking-widest animate-pulse">
+            {selectedShapeIdx !== null ? "TAP GRID TO PLACE" : "TAP SHAPE TO SELECT"}
           </p>
+          
+          <div className="mt-2 text-glowearn-gold font-black text-lg italic">
+            SCORE: {score}
+          </div>
         </div>
       </main>
 
@@ -181,12 +246,12 @@ export default function EarnPage() {
 
 function getBlockStyle(color: BlockColor) {
   switch (color) {
-    case 'red': return "bg-red-600 border border-red-400 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
-    case 'green': return "bg-green-600 border border-green-400 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
-    case 'blue': return "bg-blue-600 border border-blue-400 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
-    case 'purple': return "bg-purple-600 border border-purple-400 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
-    case 'orange': return "bg-orange-500 border border-orange-300 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
-    case 'yellow': return "bg-yellow-500 border border-yellow-300 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]";
+    case 'red': return "bg-red-600 border-red-400 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+    case 'green': return "bg-green-600 border-green-400 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+    case 'blue': return "bg-blue-600 border-blue-400 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+    case 'purple': return "bg-purple-600 border-purple-400 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+    case 'orange': return "bg-orange-500 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+    case 'yellow': return "bg-yellow-500 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
     default: return "";
   }
 }
