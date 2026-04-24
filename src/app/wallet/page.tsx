@@ -1,13 +1,15 @@
 
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GoldenInput } from '@/components/ui/GoldenInput';
+import { GoldenButton } from '@/components/ui/GoldenButton';
 
 // Official-style logos as inline SVG components
 const BinanceLogo = () => (
@@ -39,15 +41,19 @@ const BitcoinLogo = () => (
   </div>
 );
 
+type Step = 'selection' | 'details' | 'processing' | 'success';
+
 export default function WalletPage() {
   const [actualBalance] = useState<number>(1000000);
   const [coinsInput, setCoinsInput] = useState<string>("1,000,000");
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
+  const [step, setStep] = useState<Step>('selection');
+  const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
 
   const withdrawalMethods = [
-    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 85000 },
-    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, rate: 60000 },
-    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, rate: 150000 },
+    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 85000, inputLabel: "Enter JazzCash Mobile Number", placeholder: "+92 3XX XXXXXXX" },
+    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, rate: 60000, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" },
+    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, rate: 150000, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email" },
   ];
 
   const activeMethod = useMemo(() => 
@@ -57,7 +63,6 @@ export default function WalletPage() {
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
   const usdValue = (rawInputCoins / activeMethod.rate).toFixed(2);
   
-  // Logical conditions for button unlock
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
   const canWithdraw = hasMinimumRequired && isWithinBalance;
@@ -67,155 +72,280 @@ export default function WalletPage() {
     setCoinsInput(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   };
 
+  const handleSubmitRequest = () => {
+    if (!withdrawalDetail) return;
+    setStep('processing');
+    setTimeout(() => {
+      setStep('success');
+    }, 2500);
+  };
+
+  const handleReset = () => {
+    setStep('selection');
+    setWithdrawalDetail('');
+  };
+
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
       <FloatingElements />
       <Header />
       
       <main className="relative z-10 px-6 max-w-md mx-auto space-y-6 flex flex-col items-center">
-        {/* Balance Summary Section */}
-        <section className="w-full text-center space-y-1 mt-4">
-          <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Balance Summary</h3>
-          <div className="space-y-0.5">
-            <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
-            <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-              USD VALUE: <span className="italic">${(actualBalance / activeMethod.rate).toFixed(2)}</span>
-            </h1>
-          </div>
-        </section>
-
-        {/* Coin to USD Converter */}
-        <Card className={cn(
-          "w-full bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500",
-          hasMinimumRequired ? "neon-gold-border" : "border-white/10"
-        )}>
-          <CardContent className="p-8 space-y-6">
-            <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
-            
-            <div className="space-y-2">
-              <div className="relative flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
-                <div className="bg-glowearn-gold/10 p-1.5 rounded-full flex items-center justify-center">
-                  <activeMethod.Logo />
-                </div>
-                <div className="flex-1">
-                  <input 
-                    type="text" 
-                    value={coinsInput}
-                    onChange={handleCoinChange}
-                    className="bg-transparent text-white font-black text-2xl w-full focus:outline-none placeholder:text-white/20"
-                    placeholder="Enter Coins"
-                  />
-                  <span className="text-[10px] text-white/40 font-bold uppercase block -mt-1">Coins Amount</span>
-                </div>
+        {step === 'selection' && (
+          <>
+            {/* Balance Summary Section */}
+            <section className="w-full text-center space-y-1 mt-4">
+              <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Balance Summary</h3>
+              <div className="space-y-0.5">
+                <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
+                <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
+                  USD VALUE: <span className="italic">${(actualBalance / activeMethod.rate).toFixed(2)}</span>
+                </h1>
               </div>
+            </section>
 
-              {!hasMinimumRequired && (
-                <div className="flex items-center gap-2 px-2 text-destructive animate-pulse">
-                  <AlertCircle size={12} />
-                  <span className="text-[10px] font-bold uppercase tracking-tight">
-                    Minimum {activeMethod.rate.toLocaleString()} coins required for {selectedMethod}
-                  </span>
-                </div>
-              )}
-              {hasMinimumRequired && !isWithinBalance && (
-                <div className="flex items-center gap-2 px-2 text-red-400">
-                  <AlertCircle size={12} />
-                  <span className="text-[10px] font-bold uppercase tracking-tight">
-                    Insufficient Balance in Account
-                  </span>
-                </div>
-              )}
-            </div>
+            {/* Coin to USD Converter */}
+            <Card className={cn(
+              "w-full bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500",
+              hasMinimumRequired ? "neon-gold-border" : "border-white/10"
+            )}>
+              <CardContent className="p-8 space-y-6">
+                <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
+                
+                <div className="space-y-2">
+                  <div className="relative flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
+                    <div className="bg-glowearn-gold/10 p-1.5 rounded-full flex items-center justify-center">
+                      <activeMethod.Logo />
+                    </div>
+                    <div className="flex-1">
+                      <input 
+                        type="text" 
+                        value={coinsInput}
+                        onChange={handleCoinChange}
+                        className="bg-transparent text-white font-black text-2xl w-full focus:outline-none placeholder:text-white/20"
+                        placeholder="Enter Coins"
+                      />
+                      <span className="text-[10px] text-white/40 font-bold uppercase block -mt-1">Coins Amount</span>
+                    </div>
+                  </div>
 
-            <div className="flex flex-col items-center justify-center py-2 relative">
-              <ArrowRight className="text-glowearn-gold opacity-40 rotate-90 mb-4" size={32} />
-              
-              <div className={cn(
-                "px-8 py-3 rounded-2xl border flex flex-col items-center transition-all duration-300",
-                canWithdraw 
-                  ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
-                  : "bg-white/5 border-white/10"
-              )}>
-                <span className={cn(
-                  "font-black text-2xl italic tracking-tighter",
-                  canWithdraw ? "text-glowearn-gold" : "text-white/60"
-                )}>
-                  ${usdValue} USD
-                </span>
-                <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Withdrawal Value</span>
-              </div>
-            </div>
-
-            <div className="bg-black/20 p-3 rounded-xl text-center">
-              <p className="text-white/40 text-[9px] font-bold uppercase tracking-tight leading-relaxed">
-                Standard rate for {selectedMethod}<br />
-                ({activeMethod.rate.toLocaleString()} Coins = $1 USD)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Withdrawal Methods */}
-        <section className="w-full space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="text-glowearn-gold/80 font-bold uppercase tracking-widest text-xs">Withdrawal Methods</h3>
-            <span className="text-[9px] text-white/40 font-bold uppercase">Select One</span>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-3">
-            {withdrawalMethods.map((method) => {
-              const isSelected = selectedMethod === method.name;
-              return (
-                <button
-                  key={method.name}
-                  onClick={() => setSelectedMethod(method.name)}
-                  className={cn(
-                    "flex flex-col items-center p-4 rounded-2xl border transition-all duration-500 backdrop-blur-sm group h-36 relative overflow-hidden",
-                    isSelected 
-                      ? "bg-glowearn-gold/15 border-glowearn-gold/80 shadow-[0_0_20px_rgba(250,219,59,0.2)]" 
-                      : "bg-[#0c2436]/80 border-white/10 opacity-60 grayscale-[0.3] hover:grayscale-0 hover:opacity-100 hover:border-glowearn-gold/30"
-                  )}
-                >
-                  {isSelected && (
-                    <div className="absolute top-1 right-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-glowearn-gold shadow-[0_0_8px_#fadb3b]"></div>
+                  {!hasMinimumRequired && (
+                    <div className="flex items-center gap-2 px-2 text-destructive animate-pulse">
+                      <AlertCircle size={12} />
+                      <span className="text-[10px] font-bold uppercase tracking-tight">
+                        Minimum {activeMethod.rate.toLocaleString()} coins required for {selectedMethod}
+                      </span>
                     </div>
                   )}
-                  <div className="mb-4">
-                    <method.Logo />
-                  </div>
-                  <span className={cn("text-[10px] font-black uppercase mt-auto", isSelected ? "text-white" : "text-white/40")}>
-                    {method.name}
-                  </span>
-                  <span className="text-[7px] text-white/30 uppercase font-bold text-center leading-tight">{method.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                  {hasMinimumRequired && !isWithinBalance && (
+                    <div className="flex items-center gap-2 px-2 text-red-400">
+                      <AlertCircle size={12} />
+                      <span className="text-[10px] font-bold uppercase tracking-tight">
+                        Insufficient Balance in Account
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-        {/* Withdraw Button */}
-        <button 
-          disabled={!canWithdraw}
-          className={cn(
-            "w-full mt-4 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300 group",
-            canWithdraw 
-              ? "shimmer-btn shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95" 
-              : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
-          )}
-        >
-          <span className={cn(
-            "font-headline font-black text-xl uppercase tracking-widest",
-            canWithdraw ? "text-glowearn-navy" : "text-white/40"
-          )}>
-            Withdraw Funds
-          </span>
-          {!canWithdraw ? (
-            <Lock className="text-white/20" size={24} />
-          ) : (
-            <Unlock className="text-glowearn-navy" size={24} />
-          )}
-        </button>
+                <div className="flex flex-col items-center justify-center py-2 relative">
+                  <ArrowRight className="text-glowearn-gold opacity-40 rotate-90 mb-4" size={32} />
+                  
+                  <div className={cn(
+                    "px-8 py-3 rounded-2xl border flex flex-col items-center transition-all duration-300",
+                    canWithdraw 
+                      ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
+                      : "bg-white/5 border-white/10"
+                  )}>
+                    <span className={cn(
+                      "font-black text-2xl italic tracking-tighter",
+                      canWithdraw ? "text-glowearn-gold" : "text-white/60"
+                    )}>
+                      ${usdValue} USD
+                    </span>
+                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Withdrawal Value</span>
+                  </div>
+                </div>
+
+                <div className="bg-black/20 p-3 rounded-xl text-center">
+                  <p className="text-white/40 text-[9px] font-bold uppercase tracking-tight leading-relaxed">
+                    Standard rate for {selectedMethod}<br />
+                    ({activeMethod.rate.toLocaleString()} Coins = $1 USD)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Withdrawal Methods */}
+            <section className="w-full space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-glowearn-gold/80 font-bold uppercase tracking-widest text-xs">Withdrawal Methods</h3>
+                <span className="text-[9px] text-white/40 font-bold uppercase">Select One</span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                {withdrawalMethods.map((method) => {
+                  const isSelected = selectedMethod === method.name;
+                  return (
+                    <button
+                      key={method.name}
+                      onClick={() => setSelectedMethod(method.name)}
+                      className={cn(
+                        "flex flex-col items-center p-4 rounded-2xl border transition-all duration-500 backdrop-blur-sm group h-36 relative overflow-hidden",
+                        isSelected 
+                          ? "bg-glowearn-gold/15 border-glowearn-gold/80 shadow-[0_0_20px_rgba(250,219,59,0.2)]" 
+                          : "bg-[#0c2436]/80 border-white/10 opacity-60 grayscale-[0.3] hover:grayscale-0 hover:opacity-100 hover:border-glowearn-gold/30"
+                      )}
+                    >
+                      {isSelected && (
+                        <div className="absolute top-1 right-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-glowearn-gold shadow-[0_0_8px_#fadb3b]"></div>
+                        </div>
+                      )}
+                      <div className="mb-4">
+                        <method.Logo />
+                      </div>
+                      <span className={cn("text-[10px] font-black uppercase mt-auto", isSelected ? "text-white" : "text-white/40")}>
+                        {method.name}
+                      </span>
+                      <span className="text-[7px] text-white/30 uppercase font-bold text-center leading-tight">{method.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Withdraw Button */}
+            <button 
+              disabled={!canWithdraw}
+              onClick={() => setStep('details')}
+              className={cn(
+                "w-full mt-4 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300 group",
+                canWithdraw 
+                  ? "shimmer-btn shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95" 
+                  : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
+              )}
+            >
+              <span className={cn(
+                "font-headline font-black text-xl uppercase tracking-widest",
+                canWithdraw ? "text-glowearn-navy" : "text-white/40"
+              )}>
+                Withdraw Funds
+              </span>
+              {!canWithdraw ? (
+                <Lock className="text-white/20" size={24} />
+              ) : (
+                <Unlock className="text-glowearn-navy" size={24} />
+              )}
+            </button>
+          </>
+        )}
+
+        {step === 'details' && (
+          <div className="w-full space-y-8 mt-4 animate-in slide-in-from-right duration-300">
+            <button 
+              onClick={() => setStep('selection')}
+              className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
+            >
+              <ChevronLeft size={16} /> Back to Selection
+            </button>
+
+            <header className="text-center space-y-2">
+              <h1 className="text-white font-headline text-3xl font-black uppercase tracking-tight">Withdrawal <span className="text-glowearn-gold">Details</span></h1>
+              <p className="text-white/40 text-sm">Please provide your payout information</p>
+            </header>
+
+            {/* Review Summary */}
+            <Card className="bg-glowearn-gold/10 border-glowearn-gold/40 rounded-3xl overflow-hidden backdrop-blur-md">
+              <CardContent className="p-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-glowearn-navy border border-glowearn-gold/20 p-2.5 rounded-2xl shadow-lg">
+                    <activeMethod.Logo />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm">{activeMethod.name} Withdrawal</h4>
+                    <p className="text-white/40 text-[10px] uppercase font-bold">{rawInputCoins.toLocaleString()} Coins</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="block text-glowearn-gold font-black text-xl italic">${usdValue}</span>
+                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">USD Total</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+              <GoldenInput 
+                icon={Send} 
+                label={activeMethod.inputLabel} 
+                placeholder={activeMethod.placeholder}
+                value={withdrawalDetail}
+                onChange={(e) => setWithdrawalDetail(e.target.value)}
+                required
+              />
+
+              <div className="bg-black/40 p-5 rounded-[2rem] border border-white/5 flex gap-4">
+                <div className="text-glowearn-gold mt-0.5">
+                  <AlertCircle size={20} />
+                </div>
+                <p className="text-[10px] text-white/40 font-bold uppercase leading-relaxed tracking-tight">
+                  Warning: Please double check your {activeMethod.name} information. <span className="text-glowearn-gold">GlowEarn</span> is not responsible for funds sent to incorrect addresses.
+                </p>
+              </div>
+
+              <div className="pt-4">
+                <GoldenButton 
+                  onClick={handleSubmitRequest}
+                  disabled={!withdrawalDetail}
+                  className={cn(!withdrawalDetail && "opacity-50 cursor-not-allowed")}
+                >
+                  Submit Request
+                </GoldenButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'processing' && (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in duration-500">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full border-4 border-glowearn-gold/20 animate-ping"></div>
+              <Loader2 className="text-glowearn-gold animate-spin" size={80} strokeWidth={1} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Processing...</h2>
+              <p className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-xs">Securing your gold transfer</p>
+            </div>
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in duration-500 px-4">
+            <div className="bg-glowearn-gold/20 p-8 rounded-full border-4 border-glowearn-gold golden-glow relative">
+              <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1.5} />
+              <div className="absolute -top-4 -right-4 bg-glowearn-navy border border-glowearn-gold p-3 rounded-full shadow-2xl">
+                <Send className="text-glowearn-gold animate-bounce" size={24} />
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter leading-none">
+                Request <span className="text-glowearn-gold">Sent!</span>
+              </h2>
+              <Card className="bg-white/5 border-white/10 rounded-3xl p-6 backdrop-blur-xl">
+                <p className="text-white/70 font-bold text-sm leading-relaxed">
+                  Your funds are on the way. Please allow <span className="text-glowearn-gold">24-48 hours</span> for processing.
+                </p>
+              </Card>
+            </div>
+
+            <button 
+              onClick={handleReset}
+              className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-xs hover:underline pt-4"
+            >
+              Back to Wallet
+            </button>
+          </div>
+        )}
 
         <p className="text-[10px] text-white/30 font-bold uppercase text-center mt-2 px-4 leading-relaxed">
           Withdrawals are processed within 24-48 hours. Please ensure your wallet address is correct.
@@ -226,4 +356,3 @@ export default function WalletPage() {
     </div>
   );
 }
-
