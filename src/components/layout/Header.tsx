@@ -4,6 +4,7 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from 'next/navigation';
+import { CircleDollarSign } from 'lucide-react';
 
 export function Header() {
   const router = useRouter();
@@ -19,14 +20,21 @@ export function Header() {
               <AvatarFallback className="bg-glowearn-gold text-glowearn-navy font-bold">GE</AvatarFallback>
             </Avatar>
           </div>
-          <span className="font-headline font-extrabold text-white text-xl tracking-tight">GlowEarn</span>
+          <div className="flex flex-col">
+            <span className="text-white/60 text-[10px] font-bold leading-tight">Welcome,</span>
+            <span className="font-headline font-black text-white text-sm tracking-tight leading-tight">User123!</span>
+          </div>
         </div>
-        <button 
-          onClick={() => router.push('/auth/signup')}
-          className="text-white font-bold tracking-widest text-sm hover:opacity-80 transition-opacity"
-        >
-          SIGNUP
-        </button>
+
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1 rounded-full border border-glowearn-gold/30">
+              <CircleDollarSign size={14} className="text-glowearn-gold" />
+              <span className="text-white font-black text-xs">$12.50 USD</span>
+            </div>
+            <span className="text-glowearn-gold/80 font-bold text-[10px] uppercase tracking-tighter mt-1">12,500 Coins</span>
+          </div>
+        </div>
       </div>
     </header>
   );
