@@ -1,4 +1,3 @@
-
 "use client"
 
 import React from 'react';
@@ -43,7 +42,7 @@ export function BottomNav() {
               {item.label}
             </span>
             {isActive && (
-              <div className="w-1 h-1 rounded-full bg-glowearn-gold mt-1 shadow-[0_0_5px_#fadb3b]"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-glowearn-gold mt-0.5 shadow-[0_0_8px_#fadb3b]"></div>
             )}
           </Link>
         );

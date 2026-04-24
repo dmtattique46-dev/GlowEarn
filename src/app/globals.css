@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,6 +36,11 @@
 
 .golden-glow {
   box-shadow: 0 0 15px rgba(250, 219, 59, 0.4);
+}
+
+.neon-gold-border {
+  border: 1.5px solid #FADB3B;
+  box-shadow: 0 0 10px #FADB3B, inset 0 0 5px #FADB3B;
 }
 
 .golden-border {
@@ -83,5 +87,5 @@
 }
 
 .green-header-gradient {
-  background: linear-gradient(to right, #407040, #1a3d1a);
+  background: linear-gradient(to right, #0a2e0a, #051a05);
 }
