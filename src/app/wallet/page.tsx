@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Official-style logos as inline SVG components
@@ -23,9 +24,9 @@ const BinanceLogo = () => (
 
 const JazzCashLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-red-500/40 shadow-[0_0_15px_rgba(237,28,36,0.3)] relative overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-[#ED1C24] to-[#FADB3B] opacity-20"></div>
+    <div className="absolute inset-0 bg-gradient-to-br from-[#ED1C24] to-[#FADB3B] opacity-40"></div>
     <div className="relative flex items-center justify-center">
-      <span className="text-white font-black text-xl italic tracking-tighter drop-shadow-lg">JC</span>
+      <span className="text-white font-black text-xl italic tracking-tighter drop-shadow-md">JC</span>
     </div>
   </div>
 );
@@ -39,7 +40,8 @@ const BitcoinLogo = () => (
 );
 
 export default function WalletPage() {
-  const [coins, setCoins] = useState<string>("1,000,000");
+  const [actualBalance] = useState<number>(1000000);
+  const [coinsInput, setCoinsInput] = useState<string>("1,000,000");
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
 
   const withdrawalMethods = [
@@ -52,13 +54,17 @@ export default function WalletPage() {
     withdrawalMethods.find(m => m.name === selectedMethod) || withdrawalMethods[0]
   , [selectedMethod]);
 
-  const rawCoins = Number(coins.replace(/,/g, ''));
-  const usdValue = (rawCoins / activeMethod.rate).toFixed(2);
-  const isTargetValue = rawCoins >= activeMethod.rate;
+  const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
+  const usdValue = (rawInputCoins / activeMethod.rate).toFixed(2);
+  
+  // Logical conditions for button unlock
+  const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
+  const isWithinBalance = rawInputCoins <= actualBalance;
+  const canWithdraw = hasMinimumRequired && isWithinBalance;
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
-    setCoins(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+    setCoinsInput(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   };
 
   return (
@@ -71,9 +77,9 @@ export default function WalletPage() {
         <section className="w-full text-center space-y-1 mt-4">
           <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Balance Summary</h3>
           <div className="space-y-0.5">
-            <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">1,000,000</span></h2>
+            <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
             <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-              USD VALUE: <span className="italic">$20.00</span>
+              USD VALUE: <span className="italic">${(actualBalance / activeMethod.rate).toFixed(2)}</span>
             </h1>
           </div>
         </section>
@@ -81,7 +87,7 @@ export default function WalletPage() {
         {/* Coin to USD Converter */}
         <Card className={cn(
           "w-full bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500",
-          isTargetValue ? "neon-gold-border" : "border-white/10"
+          hasMinimumRequired ? "neon-gold-border" : "border-white/10"
         )}>
           <CardContent className="p-8 space-y-6">
             <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
@@ -94,7 +100,7 @@ export default function WalletPage() {
                 <div className="flex-1">
                   <input 
                     type="text" 
-                    value={coins}
+                    value={coinsInput}
                     onChange={handleCoinChange}
                     className="bg-transparent text-white font-black text-2xl w-full focus:outline-none placeholder:text-white/20"
                     placeholder="Enter Coins"
@@ -103,11 +109,19 @@ export default function WalletPage() {
                 </div>
               </div>
 
-              {!isTargetValue && (
+              {!hasMinimumRequired && (
                 <div className="flex items-center gap-2 px-2 text-destructive animate-pulse">
                   <AlertCircle size={12} />
                   <span className="text-[10px] font-bold uppercase tracking-tight">
-                    Insufficient Coins for {selectedMethod} (Min: {activeMethod.rate.toLocaleString()})
+                    Minimum {activeMethod.rate.toLocaleString()} coins required for {selectedMethod}
+                  </span>
+                </div>
+              )}
+              {hasMinimumRequired && !isWithinBalance && (
+                <div className="flex items-center gap-2 px-2 text-red-400">
+                  <AlertCircle size={12} />
+                  <span className="text-[10px] font-bold uppercase tracking-tight">
+                    Insufficient Balance in Account
                   </span>
                 </div>
               )}
@@ -118,13 +132,13 @@ export default function WalletPage() {
               
               <div className={cn(
                 "px-8 py-3 rounded-2xl border flex flex-col items-center transition-all duration-300",
-                isTargetValue 
+                canWithdraw 
                   ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
                   : "bg-white/5 border-white/10"
               )}>
                 <span className={cn(
                   "font-black text-2xl italic tracking-tighter",
-                  isTargetValue ? "text-glowearn-gold" : "text-white/60"
+                  canWithdraw ? "text-glowearn-gold" : "text-white/60"
                 )}>
                   ${usdValue} USD
                 </span>
@@ -182,24 +196,25 @@ export default function WalletPage() {
 
         {/* Withdraw Button */}
         <button 
-          disabled={!isTargetValue}
+          disabled={!canWithdraw}
           className={cn(
             "w-full mt-4 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300 group",
-            isTargetValue 
+            canWithdraw 
               ? "shimmer-btn shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95" 
-              : "bg-white/5 border border-white/10 opacity-50 cursor-not-allowed"
+              : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
           )}
         >
           <span className={cn(
             "font-headline font-black text-xl uppercase tracking-widest",
-            isTargetValue ? "text-glowearn-navy" : "text-white/20"
+            canWithdraw ? "text-glowearn-navy" : "text-white/40"
           )}>
             Withdraw Funds
           </span>
-          <Lock className={cn(
-            "transition-transform",
-            isTargetValue ? "text-glowearn-navy group-hover:rotate-12" : "text-white/10"
-          )} size={24} />
+          {!canWithdraw ? (
+            <Lock className="text-white/20" size={24} />
+          ) : (
+            <Unlock className="text-glowearn-navy" size={24} />
+          )}
         </button>
 
         <p className="text-[10px] text-white/30 font-bold uppercase text-center mt-2 px-4 leading-relaxed">
@@ -211,3 +226,4 @@ export default function WalletPage() {
     </div>
   );
 }
+
