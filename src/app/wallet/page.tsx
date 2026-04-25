@@ -6,10 +6,16 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 const BinanceLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_15px_rgba(243,186,47,0.3)]">
@@ -43,12 +49,18 @@ const BitcoinLogo = () => (
 type Step = 'selection' | 'details' | 'processing' | 'success';
 
 export default function WalletPage() {
-  // Coin Balance - Reset to Zero
-  const [actualBalance] = useState<number>(0);
+  const [user, setUser] = useState<any>(null);
   const [coinsInput, setCoinsInput] = useState<string>("0");
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
   const [step, setStep] = useState<Step>('selection');
   const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
+
+  useEffect(() => {
+    const session = localStorage.getItem('glowearn_current_user');
+    if (session) {
+      setUser(JSON.parse(session));
+    }
+  }, []);
 
   const withdrawalMethods = [
     { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 85000, inputLabel: "Enter JazzCash Mobile Number", placeholder: "+92 3XX XXXXXXX" },
@@ -63,9 +75,11 @@ export default function WalletPage() {
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
   const usdValue = (rawInputCoins / activeMethod.rate).toFixed(2);
   
+  const actualBalance = user?.points || 0;
+  const isVerified = user?.emailVerified && user?.phoneVerified; // Mock verification
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
-  const canWithdraw = hasMinimumRequired && isWithinBalance && rawInputCoins > 0;
+  const canWithdraw = hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified;
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -75,7 +89,12 @@ export default function WalletPage() {
   const handleSubmitRequest = () => {
     if (!withdrawalDetail) return;
     setStep('processing');
+    
+    // Simulate updating balance after withdrawal
     setTimeout(() => {
+      const updatedUser = { ...user, points: user.points - rawInputCoins };
+      setUser(updatedUser);
+      localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
       setStep('success');
     }, 2500);
   };
@@ -84,6 +103,8 @@ export default function WalletPage() {
     setStep('selection');
     setWithdrawalDetail('');
   };
+
+  if (!user) return null;
 
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
@@ -103,9 +124,30 @@ export default function WalletPage() {
               </div>
             </section>
 
+            {/* Verification Status Banner */}
+            {!isVerified && (
+              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
+                <ShieldAlert className="text-red-500 shrink-0" size={20} />
+                <div className="flex-1">
+                  <p className="text-white font-bold text-xs uppercase">Verification Required</p>
+                  <p className="text-red-400 text-[9px] font-bold uppercase">Verify email & phone to enable withdrawals</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    const verifiedUser = { ...user, emailVerified: true, phoneVerified: true };
+                    setUser(verifiedUser);
+                    localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
+                  }}
+                  className="bg-red-500 text-white text-[9px] font-black px-3 py-1.5 rounded-lg uppercase"
+                >
+                  Verify
+                </button>
+              </div>
+            )}
+
             <Card className={cn(
               "w-full bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500",
-              hasMinimumRequired && isWithinBalance && rawInputCoins > 0 ? "neon-gold-border" : "border-white/10"
+              canWithdraw ? "neon-gold-border" : "border-white/10"
             )}>
               <CardContent className="p-8 space-y-6">
                 <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
@@ -131,15 +173,7 @@ export default function WalletPage() {
                     <div className="flex items-center gap-2 px-2 text-destructive animate-pulse">
                       <AlertCircle size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
-                        Minimum {activeMethod.rate.toLocaleString()} coins required for {selectedMethod}
-                      </span>
-                    </div>
-                  )}
-                  {hasMinimumRequired && !isWithinBalance && (
-                    <div className="flex items-center gap-2 px-2 text-red-400">
-                      <AlertCircle size={12} />
-                      <span className="text-[10px] font-bold uppercase tracking-tight">
-                        Insufficient Balance in Account
+                        Minimum {activeMethod.rate.toLocaleString()} coins required
                       </span>
                     </div>
                   )}
@@ -166,48 +200,45 @@ export default function WalletPage() {
               </CardContent>
             </Card>
 
-            <section className="w-full space-y-4">
-              <div className="flex items-center justify-between px-2">
-                <h3 className="text-glowearn-gold/80 font-bold uppercase tracking-widest text-xs">Withdrawal Methods</h3>
-                <span className="text-[9px] text-white/40 font-bold uppercase">Select One</span>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-3">
-                {withdrawalMethods.map((method) => {
-                  const isSelected = selectedMethod === method.name;
-                  return (
-                    <button
-                      key={method.name}
-                      onClick={() => setSelectedMethod(method.name)}
-                      className={cn(
-                        "flex flex-col items-center p-4 rounded-2xl border transition-all duration-500 backdrop-blur-sm group h-36 relative overflow-hidden",
-                        isSelected 
-                          ? "bg-glowearn-gold/15 border-glowearn-gold/80 shadow-[0_0_20px_rgba(250,219,59,0.2)]" 
-                          : "bg-[#0c2436]/80 border-white/10 opacity-60 grayscale-[0.3] hover:grayscale-0 hover:opacity-100 hover:border-glowearn-gold/30"
-                      )}
-                    >
-                      {isSelected && (
-                        <div className="absolute top-1 right-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-glowearn-gold shadow-[0_0_8px_#fadb3b]"></div>
-                        </div>
-                      )}
-                      <div className="mb-4">
-                        <method.Logo />
+            {/* Withdrawal Rules Accordion */}
+            <section className="w-full">
+              <Accordion type="single" collapsible className="w-full space-y-2">
+                <AccordionItem value="rules" className="border-none bg-white/5 rounded-2xl px-4">
+                  <AccordionTrigger className="hover:no-underline py-4 text-glowearn-gold font-bold uppercase text-xs">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={16} />
+                      Withdrawal Rules & Privacy
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-4">
+                    <div className="space-y-4 text-[10px] text-white/60 font-bold uppercase leading-relaxed">
+                      <div className="flex gap-2">
+                        <Clock className="text-glowearn-gold shrink-0" size={14} />
+                        <p>Withdrawal processing takes <span className="text-white">24 to 72 hours</span>. Please be patient while we review.</p>
                       </div>
-                      <span className={cn("text-[10px] font-black uppercase mt-auto", isSelected ? "text-white" : "text-white/40")}>
-                        {method.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      <div className="flex gap-2">
+                        <ShieldAlert className="text-red-500 shrink-0" size={14} />
+                        <p>Every transaction is <span className="text-white">manually reviewed</span>. suspicious activity (auto-clickers/scripts) will result in immediate rejection.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <DollarSign className="text-green-500 shrink-0" size={14} />
+                        <p>A <span className="text-white">5% processing fee</span> applies to all withdrawals for app maintenance.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Users className="text-blue-500 shrink-0" size={14} />
+                        <p>Multiple accounts with the same wallet address will result in a <span className="text-red-500">Permanent Ban</span> of all linked accounts.</p>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </section>
 
             <button 
               disabled={!canWithdraw}
               onClick={() => setStep('details')}
               className={cn(
-                "w-full mt-4 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300 group",
+                "w-full mt-2 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300",
                 canWithdraw 
                   ? "shimmer-btn shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95" 
                   : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
@@ -234,12 +265,12 @@ export default function WalletPage() {
               onClick={() => setStep('selection')}
               className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
             >
-              <ChevronLeft size={16} /> Back to Selection
+              <ChevronLeft size={16} /> Back
             </button>
 
             <header className="text-center space-y-2">
               <h1 className="text-white font-headline text-3xl font-black uppercase tracking-tight">Withdrawal <span className="text-glowearn-gold">Details</span></h1>
-              <p className="text-white/40 text-sm">Please provide your payout information</p>
+              <p className="text-white/40 text-sm">Review your payout destination</p>
             </header>
 
             <Card className="bg-glowearn-gold/10 border-glowearn-gold/40 rounded-3xl overflow-hidden backdrop-blur-md">
@@ -249,13 +280,13 @@ export default function WalletPage() {
                     <activeMethod.Logo />
                   </div>
                   <div>
-                    <h4 className="text-white font-bold text-sm">{activeMethod.name} Withdrawal</h4>
+                    <h4 className="text-white font-bold text-sm">{activeMethod.name}</h4>
                     <p className="text-white/40 text-[10px] uppercase font-bold">{rawInputCoins.toLocaleString()} Coins</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="block text-glowearn-gold font-black text-xl italic">${usdValue}</span>
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">USD Total</span>
+                  <p className="text-red-400 text-[8px] font-black uppercase italic">-5% Fee: ${(Number(usdValue) * 0.05).toFixed(2)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -274,7 +305,7 @@ export default function WalletPage() {
                   onClick={handleSubmitRequest}
                   disabled={!withdrawalDetail}
                 >
-                  Submit Request
+                  Confirm Withdrawal
                 </GoldenButton>
               </div>
             </div>
@@ -284,15 +315,16 @@ export default function WalletPage() {
         {step === 'processing' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in duration-500">
             <Loader2 className="text-glowearn-gold animate-spin" size={80} strokeWidth={1} />
-            <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Processing...</h2>
+            <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
+            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Manual Review Protocol Initiated</p>
           </div>
         )}
 
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in duration-500 px-4">
             <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1.5} />
-            <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Sent!</span></h2>
-            <p className="text-white/70 font-bold text-sm">Your funds will arrive within 24-48 hours.</p>
+            <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Received!</span></h2>
+            <p className="text-white/70 font-bold text-sm">Your manual review has started. Expected arrival: 24-72 hours.</p>
             <button onClick={handleReset} className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-xs hover:underline">Back to Wallet</button>
           </div>
         )}
