@@ -1,7 +1,6 @@
-
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
@@ -26,8 +25,17 @@ export default function EarnPage() {
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
-  const [selectedShape, setSelectedShape] = useState<number | null>(null);
   const [showLineClear, setShowLineClear] = useState(false);
+  
+  // Drag State
+  const [dragState, setDragState] = useState<{
+    index: number | null;
+    pos: { x: number; y: number };
+    ghost: { r: number; c: number } | null;
+  }>({ index: null, pos: { x: 0, y: 0 }, ghost: null });
+
+  const boardRef = useRef<HTMLDivElement>(null);
+  const shelfRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Initialize game on mount
   useEffect(() => {
@@ -48,46 +56,19 @@ export default function EarnPage() {
     setShelf(newShelf);
   };
 
-  const handleCellClick = (r: number, c: number) => {
-    if (selectedShape === null) return;
-
-    const shape = shelf[selectedShape];
-    if (!shape) return;
-
-    // Check if placement is valid
-    if (canPlaceShape(r, c, shape.cells)) {
-      const newGrid = grid.map(row => [...row]);
-      shape.cells.forEach((row: number[], dr: number) => {
-        row.forEach((cellVal: number, dc: number) => {
-          if (cellVal !== 0) {
-            newGrid[r + dr][c + dc] = shape.color as BlockType;
-          }
-        });
-      });
-
-      setGrid(newGrid);
-      checkLineClear(newGrid);
-      
-      // Update shelf
-      const newShelf = [...shelf];
-      newShelf[selectedShape] = null;
-      setShelf(newShelf);
-      setSelectedShape(null);
-
-      // Refill shelf if all used
-      if (newShelf.every(s => s === null)) {
-        refillShelf();
-      }
+  const triggerHaptic = (pattern: number | number[]) => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(pattern);
     }
   };
 
-  const canPlaceShape = (r: number, c: number, shapeCells: number[][]) => {
+  const canPlaceShape = (r: number, c: number, shapeCells: number[][], currentGrid: BlockType[][]) => {
     for (let dr = 0; dr < shapeCells.length; dr++) {
       for (let dc = 0; dc < shapeCells[dr].length; dc++) {
         if (shapeCells[dr][dc] !== 0) {
           const nr = r + dr;
           const nc = c + dc;
-          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || grid[nr][nc] !== 0) {
+          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || currentGrid[nr][nc] !== 0) {
             return false;
           }
         }
@@ -100,14 +81,10 @@ export default function EarnPage() {
     const rowsToClear: number[] = [];
     const colsToClear: number[] = [];
 
-    // Check Rows
     for (let r = 0; r < ROWS; r++) {
-      if (currentGrid[r].every(cell => cell !== 0)) {
-        rowsToClear.push(r);
-      }
+      if (currentGrid[r].every(cell => cell !== 0)) rowsToClear.push(r);
     }
 
-    // Check Cols
     for (let c = 0; c < COLS; c++) {
       let full = true;
       for (let r = 0; r < ROWS; r++) {
@@ -131,9 +108,107 @@ export default function EarnPage() {
       setGrid(newGrid);
       setScore(prev => prev + (rowsToClear.length + colsToClear.length) * 100);
       setShowLineClear(true);
+      triggerHaptic([100, 50, 100]);
       setTimeout(() => setShowLineClear(false), 2000);
     }
   };
+
+  // Drag Handlers
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
+    if (!shelf[index]) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    setDragState({
+      index,
+      pos: { x: clientX, y: clientY },
+      ghost: null
+    });
+    triggerHaptic(30);
+  };
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (dragState.index === null) return;
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    // Calculate Grid Ghost Position
+    let newGhost: { r: number; c: number } | null = null;
+    if (boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      const cellSize = rect.width / COLS;
+      
+      // The 80px Offset Rule: Calculate the board target relative to the visual block (80px above finger)
+      const targetX = clientX - rect.left;
+      const targetY = (clientY - 80) - rect.top;
+
+      const c = Math.floor(targetX / cellSize);
+      const r = Math.floor(targetY / cellSize);
+
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+        if (canPlaceShape(r, c, shelf[dragState.index].cells, grid)) {
+          newGhost = { r, c };
+        }
+      }
+    }
+
+    setDragState(prev => ({
+      ...prev,
+      pos: { x: clientX, y: clientY },
+      ghost: newGhost
+    }));
+  }, [dragState.index, shelf, grid]);
+
+  const handleDragEnd = useCallback(() => {
+    if (dragState.index === null) {
+      setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
+      return;
+    }
+
+    const shape = shelf[dragState.index];
+    if (dragState.ghost && shape) {
+      const { r, c } = dragState.ghost;
+      const newGrid = grid.map(row => [...row]);
+      
+      shape.cells.forEach((row: number[], dr: number) => {
+        row.forEach((cellVal: number, dc: number) => {
+          if (cellVal !== 0) {
+            newGrid[r + dr][c + dc] = shape.color as BlockType;
+          }
+        });
+      });
+
+      setGrid(newGrid);
+      checkLineClear(newGrid);
+      triggerHaptic(50);
+
+      const newShelf = [...shelf];
+      newShelf[dragState.index] = null;
+      if (newShelf.every(s => s === null)) {
+        refillShelf();
+      } else {
+        setShelf(newShelf);
+      }
+    }
+
+    setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
+  }, [dragState, shelf, grid]);
+
+  useEffect(() => {
+    if (dragState.index !== null) {
+      window.addEventListener('mousemove', handleDragMove);
+      window.addEventListener('touchmove', handleDragMove, { passive: false });
+      window.addEventListener('mouseup', handleDragEnd);
+      window.addEventListener('touchend', handleDragEnd);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('touchmove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
+  }, [dragState.index, handleDragMove, handleDragEnd]);
 
   const getBlockColorClass = (type: BlockType) => {
     switch (type) {
@@ -146,8 +221,22 @@ export default function EarnPage() {
     }
   };
 
+  const isCellGhost = (r: number, c: number) => {
+    if (!dragState.ghost || dragState.index === null) return false;
+    const shape = shelf[dragState.index];
+    if (!shape) return false;
+    
+    const { r: gr, c: gc } = dragState.ghost;
+    const dr = r - gr;
+    const dc = c - gc;
+    
+    return dr >= 0 && dr < shape.cells.length && 
+           dc >= 0 && dc < shape.cells[0].length && 
+           shape.cells[dr][dc] !== 0;
+  };
+
   return (
-    <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden">
+    <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden select-none touch-none">
       <FloatingElements />
       <Header />
       
@@ -171,18 +260,20 @@ export default function EarnPage() {
           </div>
         </div>
 
-        {/* Game Board - Perfect Square Geometry */}
-        <div className="w-full max-w-[400px] aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative">
+        {/* Game Board */}
+        <div 
+          ref={boardRef}
+          className="w-full max-w-[400px] aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative"
+        >
           <div className="grid grid-cols-8 gap-1 h-full w-full">
             {grid.map((row, r) => (
               row.map((cell, c) => (
                 <div 
                   key={`${r}-${c}`}
-                  onClick={() => handleCellClick(r, c)}
                   className={cn(
-                    "aspect-square w-full rounded-sm border-2 transition-all duration-300 cursor-pointer flex items-center justify-center",
+                    "aspect-square w-full rounded-sm border-2 transition-all duration-300",
                     getBlockColorClass(cell),
-                    selectedShape !== null && shelf[selectedShape] && canPlaceShape(r, c, shelf[selectedShape].cells) && cell === 0 && "bg-glowearn-gold/20 border-glowearn-gold/40 border-dashed"
+                    isCellGhost(r, c) && "bg-white/30 border-white/50 scale-[0.9] opacity-60 ring-2 ring-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]"
                   )}
                 />
               ))
@@ -204,23 +295,53 @@ export default function EarnPage() {
           )}
         </div>
 
+        {/* Floating Dragged Block - Follows finger with 80px offset */}
+        {dragState.index !== null && shelf[dragState.index] && (
+          <div 
+            className="fixed pointer-events-none z-[100] transition-transform duration-75"
+            style={{ 
+              left: dragState.pos.x, 
+              top: dragState.pos.y - 80, // THE 80PX RULE
+              transform: 'translate(-50%, -50%) scale(1.15)', // POP-UP EFFECT
+            }}
+          >
+            <div 
+              className="grid gap-1 drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]" 
+              style={{ gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` }}
+            >
+              {shelf[dragState.index].cells.flat().map((c: number, i: number) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "w-8 h-8 aspect-square rounded-[4px] border-2",
+                    c !== 0 ? getBlockColorClass(shelf[dragState.index!].color as BlockType) : "bg-transparent border-transparent"
+                  )}
+                />
+              ))}
+            </div>
+            {/* Soft Glow Shadow Under Dragged Block */}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-full h-4 bg-black/40 blur-xl rounded-full scale-125" />
+          </div>
+        )}
+
         {/* Shape Shelf */}
         <section className="w-full space-y-4 pt-2">
           <div className="flex flex-col items-center gap-4">
              <div className="flex items-center gap-2 text-white/40">
               <MousePointer2 size={14} className="animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Tap to Select & Place</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Drag Shapes to Board</span>
              </div>
              
-             <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 backdrop-blur-md relative overflow-hidden group shadow-inner">
+             <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 backdrop-blur-md shadow-inner">
                {shelf.map((shape, idx) => (
                  <div 
                   key={idx}
-                  onClick={() => setSelectedShape(idx)}
+                  onMouseDown={(e) => handleDragStart(e, idx)}
+                  onTouchStart={(e) => handleDragStart(e, idx)}
                   className={cn(
-                    "relative flex flex-col items-center justify-center transition-all duration-300 cursor-pointer h-24 w-24 rounded-2xl border aspect-square",
-                    selectedShape === idx ? "bg-glowearn-gold/15 border-glowearn-gold scale-110 shadow-[0_0_25px_rgba(250,219,59,0.4)]" : "bg-black/30 border-white/5 hover:border-white/20",
-                    !shape && "opacity-20 pointer-events-none"
+                    "relative flex flex-col items-center justify-center transition-all duration-300 cursor-grab active:cursor-grabbing h-24 w-24 rounded-2xl border aspect-square",
+                    dragState.index === idx ? "opacity-0 scale-90" : "bg-black/30 border-white/5 hover:border-white/20 active:scale-95",
+                    !shape && "opacity-0 pointer-events-none"
                   )}
                  >
                    {shape && (
