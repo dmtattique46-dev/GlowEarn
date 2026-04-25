@@ -22,6 +22,8 @@ const SHAPES = [
   { id: 'z-shape', cells: [[5, 5, 0], [0, 5, 5]], color: 5 }, // Purple
 ];
 
+const OFFSET_Y = 80; // The 80px Rule
+
 export default function EarnPage() {
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
@@ -68,6 +70,7 @@ export default function EarnPage() {
   };
 
   const canPlaceShape = (r: number, c: number, shapeCells: number[][], currentGrid: BlockType[][]) => {
+    let hasValidCell = false;
     for (let dr = 0; dr < shapeCells.length; dr++) {
       for (let dc = 0; dc < shapeCells[dr].length; dc++) {
         if (shapeCells[dr][dc] !== 0) {
@@ -76,10 +79,11 @@ export default function EarnPage() {
           if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || currentGrid[nr][nc] !== 0) {
             return false;
           }
+          hasValidCell = true;
         }
       }
     }
-    return true;
+    return hasValidCell;
   };
 
   const checkLineClear = (currentGrid: BlockType[][]) => {
@@ -117,7 +121,7 @@ export default function EarnPage() {
       
       // Update Balance Logic
       setCoins(prev => parseFloat((prev + (totalLinesCleared * 1.00)).toFixed(2)));
-      setCoinCount(prev => prev + (totalLinesCleared * 50000)); // Every $1 is 50k coins in this reward loop
+      setCoinCount(prev => prev + (totalLinesCleared * 50000)); 
       
       setShowLineClear(true);
       setShowCoinsAnim(true);
@@ -131,8 +135,8 @@ export default function EarnPage() {
   // Drag Handlers
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     if (!shelf[index]) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     
     setDragState({
       index,
@@ -145,24 +149,31 @@ export default function EarnPage() {
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (dragState.index === null) return;
     
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
 
-    // Calculate Grid Ghost Position
     let newGhost: { r: number; c: number } | null = null;
     if (boardRef.current) {
       const rect = boardRef.current.getBoundingClientRect();
       const cellSize = rect.width / COLS;
+      const shape = shelf[dragState.index];
       
-      // The 80px Offset Rule: Calculate the board target relative to the visual block (80px above finger)
-      const targetX = clientX - rect.left;
-      const targetY = (clientY - 80) - rect.top;
+      // Center Point Logic: Calculate r, c so that the center of the visual block aligns with the grid
+      const visualX = clientX;
+      const visualY = clientY - OFFSET_Y;
 
-      const c = Math.floor(targetX / cellSize);
-      const r = Math.floor(targetY / cellSize);
+      const localX = visualX - rect.left;
+      const localY = visualY - rect.top;
 
-      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-        if (canPlaceShape(r, c, shelf[dragState.index].cells, grid)) {
+      const shapeWidth = shape.cells[0].length * cellSize;
+      const shapeHeight = shape.cells.length * cellSize;
+
+      // Adjust r, c to center the shape on the target position
+      const c = Math.round((localX - shapeWidth / 2) / cellSize);
+      const r = Math.round((localY - shapeHeight / 2) / cellSize);
+
+      if (r >= -2 && r < ROWS && c >= -2 && c < COLS) {
+        if (canPlaceShape(r, c, shape.cells, grid)) {
           newGhost = { r, c };
         }
       }
@@ -176,10 +187,7 @@ export default function EarnPage() {
   }, [dragState.index, shelf, grid]);
 
   const handleDragEnd = useCallback(() => {
-    if (dragState.index === null) {
-      setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-      return;
-    }
+    if (dragState.index === null) return;
 
     const shape = shelf[dragState.index];
     if (dragState.ghost && shape) {
@@ -282,16 +290,19 @@ export default function EarnPage() {
         >
           <div className="grid grid-cols-8 gap-1 h-full w-full">
             {grid.map((row, r) => (
-              row.map((cell, c) => (
-                <div 
-                  key={`${r}-${c}`}
-                  className={cn(
-                    "aspect-square w-full rounded-sm border-2 transition-all duration-300",
-                    getBlockColorClass(cell),
-                    isCellGhost(r, c) && "bg-white/30 border-white/50 scale-[0.9] opacity-60 ring-2 ring-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)]"
-                  )}
-                />
-              ))
+              row.map((cell, c) => {
+                const isGhost = isCellGhost(r, c);
+                return (
+                  <div 
+                    key={`${r}-${c}`}
+                    className={cn(
+                      "aspect-square w-full rounded-sm border transition-all duration-300",
+                      getBlockColorClass(cell),
+                      isGhost && "bg-white/20 border-white/40 scale-[0.95] ring-1 ring-glowearn-gold/30 shadow-[0_0_10px_rgba(250,219,59,0.2)]"
+                    )}
+                  />
+                );
+              })
             ))}
           </div>
 
@@ -313,15 +324,15 @@ export default function EarnPage() {
         {/* Floating Dragged Block - Follows finger with 80px offset */}
         {dragState.index !== null && shelf[dragState.index] && (
           <div 
-            className="fixed pointer-events-none z-[100] transition-transform duration-75"
+            className="fixed pointer-events-none z-[100]"
             style={{ 
               left: dragState.pos.x, 
-              top: dragState.pos.y - 80, // THE 80PX RULE
-              transform: 'translate(-50%, -50%) scale(1.15)', // POP-UP EFFECT
+              top: dragState.pos.y - OFFSET_Y,
+              transform: 'translate(-50%, -50%) scale(1.15)',
             }}
           >
             <div 
-              className="grid gap-1 drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]" 
+              className="grid gap-1 drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]" 
               style={{ gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` }}
             >
               {shelf[dragState.index].cells.flat().map((c: number, i: number) => (
@@ -334,8 +345,8 @@ export default function EarnPage() {
                 />
               ))}
             </div>
-            {/* Soft Glow Shadow Under Dragged Block */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-full h-4 bg-black/40 blur-xl rounded-full scale-125" />
+            {/* Glow Shadow Under Dragged Block */}
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full h-6 bg-glowearn-gold/10 blur-2xl rounded-full scale-150" />
           </div>
         )}
 
