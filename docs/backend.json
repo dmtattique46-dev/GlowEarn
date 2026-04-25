@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile information, digital wallet balance, and points within the GlowEarn application. This entity stores data essential for user identification, personalized features, and leaderboard participation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the user as provided during account creation."
+        },
+        "mobileNumber": {
+          "type": "string",
+          "description": "The user's unique mobile phone number. This is used for login, unique signup validation, and serves as a primary contact identifier."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's unique email address. This is used for login, unique signup validation, and can be used for communication.",
+          "format": "email"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL to the user's customizable golden circular avatar image. If not set, a default avatar might be used.",
+          "format": "uri"
+        },
+        "balance": {
+          "type": "number",
+          "description": "The user's current digital wallet balance. It is initialized to 0.00 upon signup and updated through earning activities."
+        },
+        "points": {
+          "type": "number",
+          "description": "The user's current points, used for leaderboard ranking. It is initialized to 0 upon signup and increases with app engagement and earning activities."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was initially created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating the last time the user profile information was updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "mobileNumber",
+        "email",
+        "balance",
+        "points",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores the complete, private profile information for each user. The document ID `{userId}` matches the Firebase Authentication UID, which is also stored in the 'id' field within the document. This structure ensures explicit ownership and authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication User ID, serving as the document identifier and owner."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/unique_mobile_numbers/{mobileNumber}",
+        "definition": {
+          "entityName": "UniqueMobileNumber",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "A lookup collection to ensure the uniqueness of mobile numbers during user signup. Each document's ID is a unique mobile number, and it contains the associated 'userId'. This facilitates atomic uniqueness checks.",
+          "params": [
+            {
+              "name": "mobileNumber",
+              "description": "The unique mobile number string used as the document identifier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/unique_emails/{email}",
+        "definition": {
+          "entityName": "UniqueEmail",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "A lookup collection to ensure the uniqueness of email addresses during user signup. Each document's ID is a unique email address, and it contains the associated 'userId'. This facilitates atomic uniqueness checks.",
+          "params": [
+            {
+              "name": "email",
+              "description": "The unique email address string used as the document identifier."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/leaderboard_profiles/{userId}",
+        "definition": {
+          "entityName": "LeaderboardProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "A denormalized collection containing public user data (name, points, avatarUrl, userId) specifically for the leaderboard display. It allows for efficient and secure public queries without exposing private user details. Includes denormalized 'userId' field for explicit ownership and update authorization.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication User ID, serving as the document identifier for the public profile."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure is designed to adhere strictly to the core design principles, especially Authorization Independence and QAPs (Queries as Permissions), while addressing the unique signup logic. It segregates data based on its security posture and access patterns.\n\n1.  **UserProfile Data (`/users/{userId}`):** This collection stores the complete, private `UserProfile` for each user. Ownership is inherently established by the path itself, where `{userId}` directly corresponds to the authenticated user's ID (`request.auth.uid`). The `UserProfile` document's `id` field will also store this `userId`, ensuring denormalized ownership within the document for clarity and robustness. This achieves **Authorization Independence** as no `get()` calls to parent documents are required for authorization; the document's path and its internal `id` field explicitly define ownership. This collection is intended for individual document reads, updates, and deletes by the owner.\n\n2.  **Unique Identifier Collections (`/unique_mobile_numbers/{mobileNumber}` and `/unique_emails/{email}`):** To enforce the unique signup requirement for `mobileNumber` and `email`, two dedicated collections are introduced. Each document in these collections will store the `userId` associated with the unique mobile number or email. This pattern enables efficient, server-side atomic checks (e.g., using Firestore transactions in Cloud Functions) to verify uniqueness during signup. **Authorization Independence** is maintained as these are distinct, top-level collections whose existence or non-existence is used for validation, not for dependent authorization logic. Reads on these collections are generally restricted to the backend for security, preventing clients from enumerating existing numbers/emails.\n\n3.  **Leaderboard Profiles (`/leaderboard_profiles/{userId}`):** To support the 'Interactive Leaderboard Display' core feature while maintaining **QAPs (Queries as Permissions)**, a separate, denormalized collection is created. This collection stores a public subset of `UserProfile` data (e.g., `userId`, `name`, `points`, `avatarUrl`) that is safe for public queries. This adheres to **Structural Segregation** by separating public-facing data from private user details. All documents in this collection share the same security posture (publicly readable), meaning any `list` query can be performed without requiring complex, potentially insecure, field-level filtering in security rules. Updates to a user's leaderboard profile are still restricted to the owner (`request.auth.uid == userId`), ensuring **Authorization Independence** for write operations.\n\nThis architecture ensures that security rules are simple, explicit, and easy to debug. It avoids complex `get()` dependencies, supports atomic operations for unique user creation, and provides a scalable solution for public leaderboard data consistent with QAP principles."
+  }
+}

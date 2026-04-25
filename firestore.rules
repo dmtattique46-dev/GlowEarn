@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * GLOWEARN SECURITY RULES - PROTOTYPING MODE
+     * 
+     * Core Philosophy:
+     * This ruleset implements a strict user-ownership model while maintaining a public leaderboard. 
+     * Security is centered around the Firebase Auth UID. Private user data is isolated, 
+     * while public profile fragments are segregated to allow for open querying.
+     * 
+     * Data Structure:
+     * - /users/{userId}: Private profile data, wallet balances, and settings. Access restricted to the owner.
+     * - /leaderboard_profiles/{userId}: Public-facing data (name, points). Read-only for everyone, writeable by owner.
+     * - /unique_mobile_numbers/{mobileNumber} & /unique_emails/{email}: Lookup collections to ensure identity uniqueness.
+     * 
+     * Key Security Decisions:
+     * - Denormalization: The 'id' (or 'userId') field is required within documents to ensure relational integrity 
+     *   between the path and the data without performing additional 'get()' calls.
+     * - Unique Identifiers: Writes to uniqueness collections are permitted only if the data contains 
+     *   the authenticated user's UID, preventing users from "squatting" on multiple identities.
+     * - Sign-Out/Persistence: Rules rely on 'request.auth'. If 'auth' is null (signed out), access to 
+     *   private collections is immediately revoked.
+     */
+
+    // --- Helper Functions ---
+
+    /** Checks if the user is authenticated with Firebase Auth. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** Checks if the provided UID matches the authenticated user. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** 
+     * Checks if the user is the owner of the existing document. 
+     * Used for update and delete operations to ensure the document exists and is owned.
+     */
+    function isExistingOwner(ownerId) {
+      return resource != null && isSignedIn() && request.auth.uid == ownerId;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the primary UserProfile collection. Stores private wallet and contact info.
+     * @path /users/{userId}
+     * @allow (get, list, create, update) if the authenticated UID matches the {userId} path variable.
+     * @deny (create) if the internal 'id' field does not match the {userId} path.
+     * @principle Restricts access to a user's own data tree and enforces internal relational integrity.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      
+      allow create: if isOwner(userId) 
+        && request.resource.data.id == userId;
+
+      allow update: if isExistingOwner(userId) 
+        && request.resource.data.id == resource.data.id;
+
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Publicly readable profile subset used for the application leaderboard.
+     * @path /leaderboard_profiles/{userId}
+     * @allow (get, list) for any user (public).
+     * @allow (create, update) if the authenticated user is the owner.
+     * @principle Structural Segregation: separates public queryable data from private profile data.
+     */
+    match /leaderboard_profiles/{userId} {
+      allow get, list: if true;
+
+      allow create: if isOwner(userId);
+
+      allow update: if isExistingOwner(userId);
+
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Lookup collection to prevent duplicate mobile number registrations.
+     * @path /unique_mobile_numbers/{mobileNumber}
+     * @allow (get) for signed-in users to check availability.
+     * @allow (create) if the user registers their own UID to this number.
+     * @deny (list) to prevent attackers from scraping the list of registered numbers.
+     * @principle Atomic uniqueness check with owner-only writes.
+     */
+    match /unique_mobile_numbers/{mobileNumber} {
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if resource != null 
+        && resource.data.userId == request.auth.uid 
+        && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if resource != null 
+        && resource.data.userId == request.auth.uid;
+    }
+
+    /**
+     * @description Lookup collection to prevent duplicate email registrations.
+     * @path /unique_emails/{email}
+     * @allow (get) for signed-in users to check availability.
+     * @allow (create) if the user registers their own UID to this email.
+     * @deny (list) to prevent attackers from scraping user emails.
+     * @principle Atomic uniqueness check with owner-only writes.
+     */
+    match /unique_emails/{email} {
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if resource != null 
+        && resource.data.userId == request.auth.uid 
+        && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if resource != null 
+        && resource.data.userId == request.auth.uid;
+    }
+
+  }
+}
