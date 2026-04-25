@@ -1,11 +1,10 @@
 
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +25,7 @@ const SHAPES = [
 export default function EarnPage() {
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
-  const [shelf, setShelf] = useState<any[]>([]);
+  const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [selectedShape, setSelectedShape] = useState<number | null>(null);
   const [showLineClear, setShowLineClear] = useState(false);
 
@@ -98,7 +97,6 @@ export default function EarnPage() {
   };
 
   const checkLineClear = (currentGrid: BlockType[][]) => {
-    let linesCleared = 0;
     const rowsToClear: number[] = [];
     const colsToClear: number[] = [];
 
@@ -139,11 +137,11 @@ export default function EarnPage() {
 
   const getBlockColorClass = (type: BlockType) => {
     switch (type) {
-      case 1: return "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300";
-      case 2: return "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300";
-      case 3: return "bg-gradient-to-br from-red-400 to-red-600 border-red-300";
-      case 4: return "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300";
-      case 5: return "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300";
+      case 1: return "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+      case 2: return "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+      case 3: return "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+      case 4: return "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
+      case 5: return "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
       default: return "bg-white/5 border-white/5";
     }
   };
@@ -173,18 +171,18 @@ export default function EarnPage() {
           </div>
         </div>
 
-        {/* Game Board */}
-        <div className="relative p-2 bg-[#0c2436]/80 rounded-[2rem] border-2 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-          <div className="grid grid-cols-8 gap-1.5 p-2">
+        {/* Game Board - Perfect Square Geometry */}
+        <div className="w-full max-w-[400px] aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative">
+          <div className="grid grid-cols-8 gap-1 h-full w-full">
             {grid.map((row, r) => (
               row.map((cell, c) => (
                 <div 
                   key={`${r}-${c}`}
                   onClick={() => handleCellClick(r, c)}
                   className={cn(
-                    "w-9 h-9 sm:w-10 sm:h-10 rounded-lg border-2 transition-all duration-300 cursor-pointer hover:border-glowearn-gold/40",
+                    "aspect-square w-full rounded-sm border-2 transition-all duration-300 cursor-pointer flex items-center justify-center",
                     getBlockColorClass(cell),
-                    selectedShape !== null && canPlaceShape(r, c, shelf[selectedShape].cells) && cell === 0 && "bg-glowearn-gold/10 border-glowearn-gold/30"
+                    selectedShape !== null && shelf[selectedShape] && canPlaceShape(r, c, shelf[selectedShape].cells) && cell === 0 && "bg-glowearn-gold/20 border-glowearn-gold/40 border-dashed"
                   )}
                 />
               ))
@@ -193,31 +191,35 @@ export default function EarnPage() {
 
           {/* Line Clear Overlay */}
           {showLineClear && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[2rem] animate-in fade-in zoom-in duration-300 z-20">
-              <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
-              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_10px_rgba(250,219,59,0.8)]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] animate-in fade-in zoom-in duration-300 z-20">
+              <div className="relative">
+                <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={64} />
+                <div className="absolute inset-0 animate-ping rounded-full bg-glowearn-gold/20"></div>
+              </div>
+              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(250,219,59,1)]">
                 LINE CLEAR!
               </h2>
-              <span className="text-white font-black text-xl italic">+100 POINTS</span>
+              <span className="text-white font-black text-2xl italic mt-2">+100 POINTS</span>
             </div>
           )}
         </div>
 
         {/* Shape Shelf */}
-        <section className="w-full space-y-4 pt-4">
-          <div className="flex flex-col items-center gap-2">
+        <section className="w-full space-y-4 pt-2">
+          <div className="flex flex-col items-center gap-4">
              <div className="flex items-center gap-2 text-white/40">
-              <MousePointer2 size={12} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Tap to Place Shapes</span>
+              <MousePointer2 size={14} className="animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Tap to Select & Place</span>
              </div>
-             <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 backdrop-blur-md relative overflow-hidden group">
+             
+             <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 backdrop-blur-md relative overflow-hidden group shadow-inner">
                {shelf.map((shape, idx) => (
                  <div 
                   key={idx}
                   onClick={() => setSelectedShape(idx)}
                   className={cn(
-                    "relative flex flex-col items-center justify-center transition-all duration-300 cursor-pointer h-24 w-24 rounded-2xl border",
-                    selectedShape === idx ? "bg-glowearn-gold/20 border-glowearn-gold scale-110 shadow-[0_0_20px_rgba(250,219,59,0.3)]" : "bg-black/20 border-white/5 hover:border-white/20",
+                    "relative flex flex-col items-center justify-center transition-all duration-300 cursor-pointer h-24 w-24 rounded-2xl border aspect-square",
+                    selectedShape === idx ? "bg-glowearn-gold/15 border-glowearn-gold scale-110 shadow-[0_0_25px_rgba(250,219,59,0.4)]" : "bg-black/30 border-white/5 hover:border-white/20",
                     !shape && "opacity-20 pointer-events-none"
                   )}
                  >
@@ -227,7 +229,7 @@ export default function EarnPage() {
                          <div 
                           key={i} 
                           className={cn(
-                            "w-4 h-4 rounded-sm border",
+                            "w-5 h-5 aspect-square rounded-[2px] border-[1px]",
                             c !== 0 ? getBlockColorClass(shape.color as BlockType) : "bg-transparent border-transparent"
                           )}
                          />
