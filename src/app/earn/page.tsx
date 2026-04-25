@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, MousePointer2 } from 'lucide-react';
+import { Sparkles, MousePointer2, Trophy, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Game Constants
@@ -22,13 +22,14 @@ const SHAPES = [
   { id: 'z-shape', cells: [[5, 5, 0], [0, 5, 5]], color: 5 }, // Purple
 ];
 
-const OFFSET_Y = 80; // The 80px Rule
+const OFFSET_Y = 80; // The 80px Rule for mobile visibility
 
 export default function EarnPage() {
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
+  const [isGameOver, setIsGameOver] = useState(false);
   
   // Coin Logic State
   const [coins, setCoins] = useState(20.00); // USD Balance
@@ -52,6 +53,7 @@ export default function EarnPage() {
   const resetGame = () => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
     setScore(0);
+    setIsGameOver(false);
     refillShelf();
   };
 
@@ -69,7 +71,7 @@ export default function EarnPage() {
     }
   };
 
-  const canPlaceShape = (r: number, c: number, shapeCells: number[][], currentGrid: BlockType[][]) => {
+  const canPlaceShape = useCallback((r: number, c: number, shapeCells: number[][], currentGrid: BlockType[][]) => {
     let hasValidCell = false;
     for (let dr = 0; dr < shapeCells.length; dr++) {
       for (let dc = 0; dc < shapeCells[dr].length; dc++) {
@@ -84,7 +86,34 @@ export default function EarnPage() {
       }
     }
     return hasValidCell;
-  };
+  }, []);
+
+  const checkGameOver = useCallback((currentGrid: BlockType[][], currentShelf: (any | null)[]) => {
+    const hasMoves = currentShelf.some((shape) => {
+      if (!shape) return false;
+      // Try every possible cell on the grid for this shape
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (canPlaceShape(r, c, shape.cells, currentGrid)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+    return !hasMoves;
+  }, [canPlaceShape]);
+
+  // Check Game Over whenever grid or shelf changes
+  useEffect(() => {
+    if (shelf.some(s => s !== null) && !isGameOver) {
+      const isOver = checkGameOver(grid, shelf);
+      if (isOver) {
+        setIsGameOver(true);
+        triggerHaptic([200, 100, 200]);
+      }
+    }
+  }, [grid, shelf, isGameOver, checkGameOver]);
 
   const checkLineClear = (currentGrid: BlockType[][]) => {
     const rowsToClear: number[] = [];
@@ -132,9 +161,8 @@ export default function EarnPage() {
     }
   };
 
-  // Drag Handlers
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
-    if (!shelf[index]) return;
+    if (!shelf[index] || isGameOver) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     
@@ -158,7 +186,6 @@ export default function EarnPage() {
       const cellSize = rect.width / COLS;
       const shape = shelf[dragState.index];
       
-      // Center Point Logic: Calculate r, c so that the center of the visual block aligns with the grid
       const visualX = clientX;
       const visualY = clientY - OFFSET_Y;
 
@@ -168,7 +195,6 @@ export default function EarnPage() {
       const shapeWidth = shape.cells[0].length * cellSize;
       const shapeHeight = shape.cells.length * cellSize;
 
-      // Adjust r, c to center the shape on the target position
       const c = Math.round((localX - shapeWidth / 2) / cellSize);
       const r = Math.round((localY - shapeHeight / 2) / cellSize);
 
@@ -184,7 +210,7 @@ export default function EarnPage() {
       pos: { x: clientX, y: clientY },
       ghost: newGhost
     }));
-  }, [dragState.index, shelf, grid]);
+  }, [dragState.index, shelf, grid, canPlaceShape]);
 
   const handleDragEnd = useCallback(() => {
     if (dragState.index === null) return;
@@ -319,9 +345,41 @@ export default function EarnPage() {
               <span className="text-white font-black text-2xl italic mt-2">+100 POINTS</span>
             </div>
           )}
+
+          {/* Game Over Overlay */}
+          {isGameOver && (
+            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
+              <div className="text-center space-y-6 px-8">
+                <div className="relative inline-block">
+                  <Trophy className="text-glowearn-gold w-16 h-16 animate-bounce mx-auto" />
+                  <div className="absolute inset-0 bg-glowearn-gold/20 blur-2xl rounded-full" />
+                </div>
+                
+                <div className="space-y-1">
+                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(250,219,59,0.5)]">
+                    GAME OVER
+                  </h2>
+                  <p className="text-white/60 font-bold uppercase tracking-widest text-[10px]">No more moves possible!</p>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl w-full">
+                  <span className="text-white/40 text-[9px] font-bold uppercase block mb-1">Final Score</span>
+                  <span className="text-white font-black text-3xl italic">{score.toLocaleString()}</span>
+                </div>
+
+                <button 
+                  onClick={resetGame}
+                  className="w-full shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2"
+                >
+                  <RotateCcw size={20} />
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Floating Dragged Block - Follows finger with 80px offset */}
+        {/* Floating Dragged Block */}
         {dragState.index !== null && shelf[dragState.index] && (
           <div 
             className="fixed pointer-events-none z-[100]"
@@ -345,13 +403,12 @@ export default function EarnPage() {
                 />
               ))}
             </div>
-            {/* Glow Shadow Under Dragged Block */}
             <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full h-6 bg-glowearn-gold/10 blur-2xl rounded-full scale-150" />
           </div>
         )}
 
         {/* Shape Shelf */}
-        <section className="w-full space-y-4 pt-2">
+        <section className={cn("w-full space-y-4 pt-2 transition-opacity duration-500", isGameOver && "opacity-20 pointer-events-none")}>
           <div className="flex flex-col items-center gap-4">
              <div className="flex items-center gap-2 text-white/40">
               <MousePointer2 size={14} className="animate-pulse" />
