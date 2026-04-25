@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
@@ -76,7 +76,7 @@ export default function WalletPage() {
   const usdValue = (rawInputCoins / activeMethod.rate).toFixed(2);
   
   const actualBalance = user?.points || 0;
-  const isVerified = user?.emailVerified && user?.phoneVerified; // Mock verification
+  const isVerified = user?.emailVerified && user?.phoneVerified;
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
   const canWithdraw = hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified;
@@ -86,15 +86,36 @@ export default function WalletPage() {
     setCoinsInput(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   };
 
+  const handleVerify = () => {
+    const verifiedUser = { ...user, emailVerified: true, phoneVerified: true };
+    setUser(verifiedUser);
+    localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
+    
+    // Update main users list for persistence
+    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+    const index = users.findIndex((u: any) => u.id === user.id);
+    if (index !== -1) {
+      users[index] = verifiedUser;
+      localStorage.setItem('glowearn_users', JSON.stringify(users));
+    }
+  };
+
   const handleSubmitRequest = () => {
     if (!withdrawalDetail) return;
     setStep('processing');
     
-    // Simulate updating balance after withdrawal
     setTimeout(() => {
       const updatedUser = { ...user, points: user.points - rawInputCoins };
       setUser(updatedUser);
       localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
+      
+      const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+      const index = users.findIndex((u: any) => u.id === user.id);
+      if (index !== -1) {
+        users[index] = updatedUser;
+        localStorage.setItem('glowearn_users', JSON.stringify(users));
+      }
+      
       setStep('success');
     }, 2500);
   };
@@ -102,6 +123,7 @@ export default function WalletPage() {
   const handleReset = () => {
     setStep('selection');
     setWithdrawalDetail('');
+    setCoinsInput('0');
   };
 
   if (!user) return null;
@@ -126,21 +148,17 @@ export default function WalletPage() {
 
             {/* Verification Status Banner */}
             {!isVerified && (
-              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
-                <ShieldAlert className="text-red-500 shrink-0" size={20} />
+              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3 animate-pulse">
+                <ShieldAlert className="text-red-500 shrink-0" size={24} />
                 <div className="flex-1">
-                  <p className="text-white font-bold text-xs uppercase">Verification Required</p>
-                  <p className="text-red-400 text-[9px] font-bold uppercase">Verify email & phone to enable withdrawals</p>
+                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Account Not Verified</p>
+                  <p className="text-red-400 text-[9px] font-bold uppercase leading-tight">Identity verification required to unlock withdrawal vault.</p>
                 </div>
                 <button 
-                  onClick={() => {
-                    const verifiedUser = { ...user, emailVerified: true, phoneVerified: true };
-                    setUser(verifiedUser);
-                    localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
-                  }}
-                  className="bg-red-500 text-white text-[9px] font-black px-3 py-1.5 rounded-lg uppercase"
+                  onClick={handleVerify}
+                  className="bg-red-600 text-white text-[9px] font-black px-4 py-2 rounded-xl uppercase shadow-lg active:scale-95 transition-all"
                 >
-                  Verify
+                  Verify Now
                 </button>
               </div>
             )}
@@ -170,7 +188,7 @@ export default function WalletPage() {
                   </div>
 
                   {rawInputCoins > 0 && !hasMinimumRequired && (
-                    <div className="flex items-center gap-2 px-2 text-destructive animate-pulse">
+                    <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1">
                       <AlertCircle size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
                         Minimum {activeMethod.rate.toLocaleString()} coins required
@@ -183,50 +201,79 @@ export default function WalletPage() {
                   <ArrowRight className="text-glowearn-gold opacity-40 rotate-90 mb-4" size={32} />
                   
                   <div className={cn(
-                    "px-8 py-3 rounded-2xl border flex flex-col items-center transition-all duration-300",
+                    "px-8 py-4 rounded-3xl border flex flex-col items-center transition-all duration-300 w-full text-center relative overflow-hidden",
                     canWithdraw 
                       ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
                       : "bg-white/5 border-white/10"
                   )}>
                     <span className={cn(
-                      "font-black text-2xl italic tracking-tighter",
-                      canWithdraw ? "text-glowearn-gold" : "text-white/60"
+                      "font-black text-3xl italic tracking-tighter block",
+                      canWithdraw ? "text-glowearn-gold" : "text-white/40"
                     )}>
                       ${usdValue} USD
                     </span>
-                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Withdrawal Value</span>
+                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Est. Withdrawal Value</span>
+                    
+                    {canWithdraw && (
+                      <div className="absolute top-1 right-2">
+                        <CheckCircle2 size={16} className="text-glowearn-gold" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Withdrawal Rules Accordion */}
+            {/* Withdrawal Rules & Privacy Policy Accordion */}
             <section className="w-full">
-              <Accordion type="single" collapsible className="w-full space-y-2">
-                <AccordionItem value="rules" className="border-none bg-white/5 rounded-2xl px-4">
-                  <AccordionTrigger className="hover:no-underline py-4 text-glowearn-gold font-bold uppercase text-xs">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={16} />
+              <Accordion type="single" collapsible className="w-full space-y-3">
+                <AccordionItem value="policy" className="border-none bg-[#0c2436]/40 rounded-[2rem] px-5 border border-white/5 overflow-hidden">
+                  <AccordionTrigger className="hover:no-underline py-5 text-glowearn-gold font-black uppercase text-[11px] tracking-widest">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck size={18} className="text-glowearn-gold" />
                       Withdrawal Rules & Privacy
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    <div className="space-y-4 text-[10px] text-white/60 font-bold uppercase leading-relaxed">
-                      <div className="flex gap-2">
-                        <Clock className="text-glowearn-gold shrink-0" size={14} />
-                        <p>Withdrawal processing takes <span className="text-white">24 to 72 hours</span>. Please be patient while we review.</p>
+                  <AccordionContent className="pb-6">
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
+                        <Clock className="text-glowearn-gold shrink-0 mt-1" size={16} />
+                        <div>
+                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Processing Time</p>
+                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
+                            Withdrawal processing takes <span className="text-white">24 to 72 hours</span>. Please be patient while we review.
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <ShieldAlert className="text-red-500 shrink-0" size={14} />
-                        <p>Every transaction is <span className="text-white">manually reviewed</span>. suspicious activity (auto-clickers/scripts) will result in immediate rejection.</p>
+
+                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
+                        <ShieldAlert className="text-red-500 shrink-0 mt-1" size={16} />
+                        <div>
+                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Manual Tracking Policy</p>
+                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
+                            Hum har transaction ko <span className="text-red-500">manually review</span> karte hain. suspicious activity payi gayi toh payment reject hogi.
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <DollarSign className="text-green-500 shrink-0" size={14} />
-                        <p>A <span className="text-white">5% processing fee</span> applies to all withdrawals for app maintenance.</p>
+
+                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
+                        <DollarSign className="text-green-500 shrink-0 mt-1" size={16} />
+                        <div>
+                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Fair Play Tax</p>
+                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
+                            App maintenance ke liye har withdrawal par <span className="text-green-500">5% processing fee</span> kategi.
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Users className="text-blue-500 shrink-0" size={14} />
-                        <p>Multiple accounts with the same wallet address will result in a <span className="text-red-500">Permanent Ban</span> of all linked accounts.</p>
+
+                      <div className="flex items-start gap-3 p-3 bg-red-500/10 rounded-2xl border border-red-500/20">
+                        <Users className="text-red-500 shrink-0 mt-1" size={16} />
+                        <div>
+                          <p className="text-red-500 text-[10px] font-black uppercase tracking-tight">Permanent Ban Clause</p>
+                          <p className="text-white/70 text-[9px] font-bold uppercase mt-1 leading-relaxed">
+                            Multiple accounts bana kar ek hi wallet mein withdraw lene par <span className="text-red-500">Permanent Ban</span> hoga.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </AccordionContent>
@@ -248,7 +295,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                Withdraw Funds
+                {isVerified ? 'Confirm Withdrawal' : 'Verification Required'}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />
@@ -265,28 +312,46 @@ export default function WalletPage() {
               onClick={() => setStep('selection')}
               className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
             >
-              <ChevronLeft size={16} /> Back
+              <ChevronLeft size={16} /> Back to Vault
             </button>
 
             <header className="text-center space-y-2">
-              <h1 className="text-white font-headline text-3xl font-black uppercase tracking-tight">Withdrawal <span className="text-glowearn-gold">Details</span></h1>
-              <p className="text-white/40 text-sm">Review your payout destination</p>
+              <h1 className="text-white font-headline text-3xl font-black uppercase tracking-tight">Final <span className="text-glowearn-gold">Review</span></h1>
+              <p className="text-white/40 text-sm">Review your payout and fee deductions</p>
             </header>
 
             <Card className="bg-glowearn-gold/10 border-glowearn-gold/40 rounded-3xl overflow-hidden backdrop-blur-md">
-              <CardContent className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="bg-glowearn-navy border border-glowearn-gold/20 p-2.5 rounded-2xl shadow-lg">
-                    <activeMethod.Logo />
+              <CardContent className="p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-glowearn-navy border border-glowearn-gold/20 p-2.5 rounded-2xl shadow-lg">
+                      <activeMethod.Logo />
+                    </div>
+                    <div>
+                      <h4 className="text-white font-black text-sm uppercase tracking-tight">{activeMethod.name}</h4>
+                      <p className="text-white/40 text-[9px] uppercase font-bold">{rawInputCoins.toLocaleString()} Coins Redeemed</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-white font-bold text-sm">{activeMethod.name}</h4>
-                    <p className="text-white/40 text-[10px] uppercase font-bold">{rawInputCoins.toLocaleString()} Coins</p>
+                  <div className="text-right">
+                    <span className="block text-glowearn-gold font-black text-2xl italic">${usdValue}</span>
+                    <span className="text-white/40 text-[8px] font-black uppercase tracking-widest">Gross Total</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="block text-glowearn-gold font-black text-xl italic">${usdValue}</span>
-                  <p className="text-red-400 text-[8px] font-black uppercase italic">-5% Fee: ${(Number(usdValue) * 0.05).toFixed(2)}</p>
+
+                <div className="pt-4 border-t border-glowearn-gold/10 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 font-bold text-[10px] uppercase tracking-wider">Maintenance Fee (5%)</span>
+                    <span className="text-red-400 font-black text-xs">-${(Number(usdValue) * 0.05).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-glowearn-gold/5 rounded-xl border border-glowearn-gold/10">
+                    <span className="text-glowearn-gold font-black text-xs uppercase tracking-widest">Net Payout</span>
+                    <span className="text-white font-black text-xl italic">${(Number(usdValue) * 0.95).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 text-[9px] text-white/40 font-bold uppercase leading-tight italic">
+                  <Info size={10} className="shrink-0 mt-0.5" />
+                  <p>By confirming, you agree to our manual review protocol and 24-72h processing window.</p>
                 </div>
               </CardContent>
             </Card>
@@ -305,7 +370,7 @@ export default function WalletPage() {
                   onClick={handleSubmitRequest}
                   disabled={!withdrawalDetail}
                 >
-                  Confirm Withdrawal
+                  Confirm & Transfer
                 </GoldenButton>
               </div>
             </div>
@@ -314,18 +379,34 @@ export default function WalletPage() {
 
         {step === 'processing' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in duration-500">
-            <Loader2 className="text-glowearn-gold animate-spin" size={80} strokeWidth={1} />
-            <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
-            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Manual Review Protocol Initiated</p>
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full border-4 border-glowearn-gold/20 animate-ping"></div>
+              <Loader2 className="text-glowearn-gold animate-spin relative z-10" size={100} strokeWidth={1} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
+              <p className="text-glowearn-gold/60 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Manual Review Protocol Active</p>
+            </div>
           </div>
         )}
 
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in duration-500 px-4">
-            <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1.5} />
-            <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Received!</span></h2>
-            <p className="text-white/70 font-bold text-sm">Your manual review has started. Expected arrival: 24-72 hours.</p>
-            <button onClick={handleReset} className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-xs hover:underline">Back to Wallet</button>
+            <div className="bg-glowearn-gold/10 p-8 rounded-full border-2 border-glowearn-gold/30 shadow-[0_0_50px_rgba(250,219,59,0.2)]">
+              <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1} />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Queued!</span></h2>
+              <p className="text-white/70 font-bold text-sm leading-relaxed max-w-[280px] mx-auto">
+                Your manual review has started. Expected arrival: <span className="text-glowearn-gold">24-72 hours</span>.
+              </p>
+            </div>
+            <button 
+              onClick={handleReset} 
+              className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-[10px] hover:underline hover:scale-110 transition-transform"
+            >
+              Return to Wallet
+            </button>
           </div>
         )}
       </main>
@@ -334,3 +415,4 @@ export default function WalletPage() {
     </div>
   );
 }
+
