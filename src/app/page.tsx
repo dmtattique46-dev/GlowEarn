@@ -10,18 +10,31 @@ import { Sparkles, TrendingUp, DollarSign, Target, Trophy } from 'lucide-react';
 import { aiEarningRecommendations } from '@/ai/flows/ai-earning-recommendations';
 import type { AiEarningRecommendationsOutput } from '@/ai/flows/ai-earning-recommendations';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<AiEarningRecommendationsOutput | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const session = localStorage.getItem('glowearn_current_user');
+    if (!session) {
+      router.push('/auth/signup');
+    } else {
+      setUser(JSON.parse(session));
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
     async function fetchAiTips() {
       try {
         const result = await aiEarningRecommendations({
-          userId: "user-123",
-          userProfile: "Ambitious earner, likes surveys and quick tasks, active daily.",
-          userActivityHistory: "New account, just started. Looking to maximize early earnings."
+          userId: user.id,
+          userProfile: `Ambitious earner named ${user.name}, likes puzzle games. Current level: ${user.level}`,
+          userActivityHistory: `New account with ${user.points} points. Looking to maximize earnings.`
         });
         setRecommendations(result);
       } catch (error) {
@@ -31,19 +44,21 @@ export default function Home() {
       }
     }
     fetchAiTips();
-  }, []);
+  }, [user]);
+
+  if (!user) return null;
 
   return (
     <div className="relative min-h-screen pb-24 pt-20">
       <FloatingElements />
-      <Header usdBalance={0} coinCount={0} />
+      <Header usdBalance={user.balance} coinCount={user.points} />
       
       <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-6">
         <section className="mt-4">
           <h2 className="text-white font-headline text-2xl font-black uppercase tracking-tight">
-            Hello, <span className="text-glowearn-gold">Glow Earner!</span>
+            Hello, <span className="text-glowearn-gold">{user.name.split(' ')[0]}!</span>
           </h2>
-          <p className="text-white/60 text-sm mt-1">Your daily potential is glowing today.</p>
+          <p className="text-white/60 text-sm mt-1">Your earning potential is glowing today.</p>
         </section>
 
         <div className="grid grid-cols-2 gap-4">
@@ -53,7 +68,7 @@ export default function Home() {
                 <DollarSign className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Earnings</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">$0.00</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">${user.balance.toFixed(2)}</span>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-glowearn-gold/20 backdrop-blur-md rounded-2xl overflow-hidden">
@@ -61,8 +76,8 @@ export default function Home() {
               <div className="bg-glowearn-gold/20 p-2 rounded-full mb-2">
                 <TrendingUp className="text-glowearn-gold" size={20} />
               </div>
-              <span className="text-white/40 text-[10px] uppercase font-bold">Rank</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">#---</span>
+              <span className="text-white/40 text-[10px] uppercase font-bold">Points</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">{user.points.toLocaleString()}</span>
             </CardContent>
           </Card>
         </div>
@@ -74,15 +89,11 @@ export default function Home() {
           </div>
           
           <Card className="bg-glowearn-navy border border-glowearn-gold/40 relative overflow-hidden rounded-2xl shadow-[0_0_20px_rgba(250,219,59,0.1)]">
-            <div className="absolute top-0 right-0 p-3 opacity-10">
-              <Sparkles className="text-glowearn-gold" size={60} />
-            </div>
             <CardContent className="p-6">
               {loading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-4 w-3/4 bg-white/10" />
                   <Skeleton className="h-4 w-full bg-white/10" />
-                  <Skeleton className="h-20 w-full bg-white/10" />
                 </div>
               ) : (
                 <>
@@ -91,8 +102,8 @@ export default function Home() {
                   </p>
                   <ul className="mt-4 space-y-3">
                     {recommendations?.recommendations.map((rec, i) => (
-                      <li key={i} className="flex gap-3 items-start group">
-                        <div className="bg-glowearn-gold rounded-full p-1 mt-1 group-hover:scale-110 transition-transform">
+                      <li key={i} className="flex gap-3 items-start">
+                        <div className="bg-glowearn-gold rounded-full p-1 mt-1">
                           <Target size={12} className="text-glowearn-navy" />
                         </div>
                         <span className="text-white/80 text-sm">{rec}</span>
@@ -103,32 +114,6 @@ export default function Home() {
               )}
             </CardContent>
           </Card>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-white/40 font-bold uppercase tracking-widest text-xs px-1">Trending Opportunities</h3>
-          {[
-            { title: "Watch & Earn", desc: "Watch 30s ads for quick coins", reward: "$0.05", icon: Sparkles },
-            { title: "Weekly Challenge", desc: "Top 10 sharers get bonus gold", reward: "$5.00", icon: Trophy },
-          ].map((task, idx) => (
-            <Card key={idx} className="bg-white/5 border-glowearn-gold/10 rounded-2xl hover:border-glowearn-gold/30 transition-colors cursor-pointer group">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="bg-glowearn-navy border border-glowearn-gold/20 p-3 rounded-xl">
-                    <task.icon className="text-glowearn-gold" size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-white font-bold text-sm">{task.title}</h4>
-                    <p className="text-white/40 text-[11px]">{task.desc}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="block text-glowearn-gold font-black text-sm">{task.reward}</span>
-                  <span className="text-[10px] text-white/40 uppercase font-bold">Earn</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
         </section>
       </main>
 

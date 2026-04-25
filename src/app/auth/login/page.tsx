@@ -1,32 +1,44 @@
 
 "use client"
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Welcome Back!",
-      description: "You've successfully logged into GlowEarn.",
-    });
-    router.push('/');
+    setError('');
+
+    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+    const user = users.find((u: any) => u.email === email && u.password === password);
+
+    if (user) {
+      localStorage.setItem('glowearn_current_user', JSON.stringify(user));
+      toast({
+        title: "Welcome Back!",
+        description: "You've successfully logged into GlowEarn.",
+      });
+      router.push('/');
+    } else {
+      setError('Invalid email or password!');
+    }
   };
 
   return (
     <div className="relative min-h-screen pt-24 pb-12">
       <FloatingElements />
-      <Header />
       
       <main className="relative z-10 px-6 max-w-md mx-auto">
         <div className="text-center mb-10">
@@ -37,11 +49,20 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
+              <AlertCircle className="text-red-500 shrink-0" size={18} />
+              <p className="text-red-500 text-xs font-bold uppercase tracking-tight">{error}</p>
+            </div>
+          )}
+
           <GoldenInput 
             icon={Mail} 
             label="Email Address" 
             placeholder="john@example.com" 
             type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required 
           />
           <GoldenInput 
@@ -49,6 +70,8 @@ export default function LoginPage() {
             label="Password" 
             placeholder="••••••••" 
             type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required 
           />
 

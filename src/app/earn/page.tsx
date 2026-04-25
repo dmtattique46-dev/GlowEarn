@@ -7,33 +7,32 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Sparkles, MousePointer2, Trophy, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 // Game Constants
 const ROWS = 8;
 const COLS = 8;
 
-type BlockType = 0 | 1 | 2 | 3 | 4 | 5; // 0 is empty, 1-5 are colors
+type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
 
 const SHAPES = [
-  { id: 'square', cells: [[1, 1], [1, 1]], color: 1 }, // Yellow
-  { id: 'l-shape', cells: [[2, 0], [2, 0], [2, 2]], color: 2 }, // Orange
-  { id: 't-shape', cells: [[0, 3, 0], [3, 3, 3]], color: 3 }, // Red
-  { id: 'i-shape', cells: [[4, 4, 4, 4]], color: 4 }, // Blue
-  { id: 'z-shape', cells: [[5, 5, 0], [0, 5, 5]], color: 5 }, // Purple
+  { id: 'square', cells: [[1, 1], [1, 1]], color: 1 },
+  { id: 'l-shape', cells: [[2, 0], [2, 0], [2, 2]], color: 2 },
+  { id: 't-shape', cells: [[0, 3, 0], [3, 3, 3]], color: 3 },
+  { id: 'i-shape', cells: [[4, 4, 4, 4]], color: 4 },
+  { id: 'z-shape', cells: [[5, 5, 0], [0, 5, 5]], color: 5 },
 ];
 
-const OFFSET_Y = 80; // The 80px Rule for mobile visibility
+const OFFSET_Y = 80;
 
 export default function EarnPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
-  
-  // Coin Logic State - Reset to Zero
-  const [coins, setCoins] = useState(0.00); // USD Balance
-  const [coinCount, setCoinCount] = useState(0); // Integer Coins
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
 
   // Drag State
@@ -45,10 +44,30 @@ export default function EarnPage() {
 
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Initialize game on mount
   useEffect(() => {
-    resetGame();
-  }, []);
+    const session = localStorage.getItem('glowearn_current_user');
+    if (!session) {
+      router.push('/auth/signup');
+    } else {
+      setUser(JSON.parse(session));
+      resetGame();
+    }
+  }, [router]);
+
+  const updateUserPersistence = (newBalance: number, newPoints: number) => {
+    if (!user) return;
+    const updatedUser = { ...user, balance: newBalance, points: newPoints };
+    setUser(updatedUser);
+    localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
+    
+    // Also update in global users list
+    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+    const userIndex = users.findIndex((u: any) => u.id === user.id);
+    if (userIndex > -1) {
+      users[userIndex] = updatedUser;
+      localStorage.setItem('glowearn_users', JSON.stringify(users));
+    }
+  };
 
   const resetGame = () => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
@@ -144,11 +163,14 @@ export default function EarnPage() {
       });
 
       setGrid(newGrid);
-      setScore(prev => prev + totalLinesCleared * 100);
+      const pointsEarned = totalLinesCleared * 100;
+      const balanceEarned = totalLinesCleared * 1.00;
       
-      // Update Balance Logic
-      setCoins(prev => parseFloat((prev + (totalLinesCleared * 1.00)).toFixed(2)));
-      setCoinCount(prev => prev + (totalLinesCleared * 50000)); 
+      setScore(prev => prev + pointsEarned);
+      
+      if (user) {
+        updateUserPersistence(user.balance + balanceEarned, user.points + (totalLinesCleared * 50000));
+      }
       
       setShowLineClear(true);
       setShowCoinsAnim(true);
@@ -257,44 +279,14 @@ export default function EarnPage() {
     };
   }, [dragState.index, handleDragMove, handleDragEnd]);
 
-  const getBlockColorClass = (type: BlockType) => {
-    switch (type) {
-      case 1: return "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
-      case 2: return "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
-      case 3: return "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
-      case 4: return "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
-      case 5: return "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]";
-      default: return "bg-white/5 border-white/5";
-    }
-  };
-
-  const isCellGhost = (r: number, c: number) => {
-    if (!dragState.ghost || dragState.index === null) return false;
-    const shape = shelf[dragState.index];
-    if (!shape) return false;
-    
-    const { r: gr, c: gc } = dragState.ghost;
-    const dr = r - gr;
-    const dc = c - gc;
-    
-    return dr >= 0 && dr < shape.cells.length && 
-           dc >= 0 && dc < shape.cells[0].length && 
-           shape.cells[dr][dc] !== 0;
-  };
+  if (!user) return null;
 
   return (
     <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden select-none touch-none">
       <FloatingElements />
-      <Header usdBalance={coins} coinCount={coinCount} animate={showCoinsAnim} />
+      <Header usdBalance={user.balance} coinCount={user.points} animate={showCoinsAnim} />
       
       <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
-        <div className="w-full bg-glowearn-forest/20 border border-glowearn-forest/40 rounded-2xl py-3 px-4 flex items-center justify-between animate-pulse">
-          <div className="flex items-center gap-2">
-            <Sparkles className="text-glowearn-gold" size={16} />
-            <span className="text-glowearn-gold font-bold text-[10px] uppercase tracking-wider">Daily Bonus: Play today to earn +500 Coins!</span>
-          </div>
-        </div>
-
         <div className="text-center space-y-1">
           <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
             GLOW BLOCK PUZZLE
@@ -311,128 +303,72 @@ export default function EarnPage() {
         >
           <div className="grid grid-cols-8 gap-1 h-full w-full">
             {grid.map((row, r) => (
-              row.map((cell, c) => {
-                const isGhost = isCellGhost(r, c);
-                return (
-                  <div 
-                    key={`${r}-${c}`}
-                    className={cn(
-                      "aspect-square w-full rounded-sm border transition-all duration-300",
-                      getBlockColorClass(cell),
-                      isGhost && "bg-white/20 border-white/40 scale-[0.95] ring-1 ring-glowearn-gold/30 shadow-[0_0_10px_rgba(250,219,59,0.2)]"
-                    )}
-                  />
-                );
-              })
+              row.map((cell, c) => (
+                <div 
+                  key={`${r}-${c}`}
+                  className={cn(
+                    "aspect-square w-full rounded-sm border transition-all duration-300",
+                    cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                    cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                    cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                    cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                    cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                    cell === 0 && "bg-white/5 border-white/5"
+                  )}
+                />
+              ))
             ))}
           </div>
 
           {showLineClear && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] animate-in fade-in zoom-in duration-300 z-20">
-              <div className="relative">
-                <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={64} />
-                <div className="absolute inset-0 animate-ping rounded-full bg-glowearn-gold/20"></div>
-              </div>
-              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(250,219,59,1)]">
-                LINE CLEAR!
-              </h2>
-              <span className="text-white font-black text-2xl italic mt-2">+100 POINTS</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] z-20">
+              <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={64} />
+              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter">LINE CLEAR!</h2>
             </div>
           )}
 
           {isGameOver && (
-            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
-              <div className="text-center space-y-6 px-8">
-                <div className="relative inline-block">
-                  <Trophy className="text-glowearn-gold w-16 h-16 animate-bounce mx-auto" />
-                  <div className="absolute inset-0 bg-glowearn-gold/20 blur-2xl rounded-full" />
-                </div>
-                
-                <div className="space-y-1">
-                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(250,219,59,0.5)]">
-                    GAME OVER
-                  </h2>
-                  <p className="text-white/60 font-bold uppercase tracking-widest text-[10px]">No more moves possible!</p>
-                </div>
-
-                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl w-full">
-                  <span className="text-white/40 text-[9px] font-bold uppercase block mb-1">Final Score</span>
-                  <span className="text-white font-black text-3xl italic">{score.toLocaleString()}</span>
-                </div>
-
-                <button 
-                  onClick={resetGame}
-                  className="w-full shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2"
-                >
-                  <RotateCcw size={20} />
-                  Play Again
-                </button>
-              </div>
+            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem]">
+              <Trophy className="text-glowearn-gold w-16 h-16 animate-bounce mb-4" />
+              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
+              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Score: {score}</p>
+              <button 
+                onClick={resetGame}
+                className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2"
+              >
+                <RotateCcw size={20} /> Play Again
+              </button>
             </div>
           )}
         </div>
 
-        {dragState.index !== null && shelf[dragState.index] && (
-          <div 
-            className="fixed pointer-events-none z-[100]"
-            style={{ 
-              left: dragState.pos.x, 
-              top: dragState.pos.y - OFFSET_Y,
-              transform: 'translate(-50%, -50%) scale(1.15)',
-            }}
-          >
-            <div 
-              className="grid gap-1 drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]" 
-              style={{ gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` }}
-            >
-              {shelf[dragState.index].cells.flat().map((c: number, i: number) => (
-                <div 
-                  key={i} 
-                  className={cn(
-                    "w-8 h-8 aspect-square rounded-[4px] border-2",
-                    c !== 0 ? getBlockColorClass(shelf[dragState.index!].color as BlockType) : "bg-transparent border-transparent"
-                  )}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <section className={cn("w-full space-y-4 pt-2 transition-opacity duration-500", isGameOver && "opacity-20 pointer-events-none")}>
-          <div className="flex flex-col items-center gap-4">
-             <div className="flex items-center gap-2 text-white/40">
-              <MousePointer2 size={14} className="animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Drag Shapes to Board</span>
-             </div>
-             
-             <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 backdrop-blur-md shadow-inner">
-               {shelf.map((shape, idx) => (
-                 <div 
-                  key={idx}
-                  onMouseDown={(e) => handleDragStart(e, idx)}
-                  onTouchStart={(e) => handleDragStart(e, idx)}
-                  className={cn(
-                    "relative flex flex-col items-center justify-center transition-all duration-300 cursor-grab active:cursor-grabbing h-24 w-24 rounded-2xl border aspect-square",
-                    dragState.index === idx ? "opacity-0 scale-90" : "bg-black/30 border-white/5 hover:border-white/20 active:scale-95",
-                    !shape && "opacity-0 pointer-events-none"
-                  )}
-                 >
-                   {shape && (
-                     <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
-                       {shape.cells.flat().map((c: number, i: number) => (
-                         <div 
-                          key={i} 
-                          className={cn(
-                            "w-5 h-5 aspect-square rounded-[2px] border-[1px]",
-                            c !== 0 ? getBlockColorClass(shape.color as BlockType) : "bg-transparent border-transparent"
-                          )}
-                         />
-                       ))}
-                     </div>
-                   )}
-                 </div>
-               ))}
-             </div>
+        <section className={cn("w-full space-y-4 pt-2", isGameOver && "opacity-20 pointer-events-none")}>
+          <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5">
+            {shelf.map((shape, idx) => (
+              <div 
+                key={idx}
+                onMouseDown={(e) => handleDragStart(e, idx)}
+                onTouchStart={(e) => handleDragStart(e, idx)}
+                className={cn(
+                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border",
+                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5",
+                  !shape && "opacity-0"
+                )}
+              >
+                {shape && (
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
+                    {shape.cells.flat().map((c: number, i: number) => (
+                      <div 
+                        key={i} 
+                        className={cn("w-5 h-5 rounded-[2px] border-[1px]", 
+                          c !== 0 ? "bg-glowearn-gold border-white/40" : "bg-transparent border-transparent"
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </section>
       </main>
