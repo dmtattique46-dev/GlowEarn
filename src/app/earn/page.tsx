@@ -56,11 +56,35 @@ export default function EarnPage() {
 
   const updateUserPersistence = (newBalance: number, newPoints: number) => {
     if (!user) return;
-    const updatedUser = { ...user, balance: newBalance, points: newPoints };
+    
+    // Leveling Logic
+    const calculateLevel = (totalXP: number) => {
+      let level = 1;
+      let remainingXP = totalXP;
+      
+      // Level 1-15: 100 XP each
+      while (level < 15 && remainingXP >= 100) {
+        remainingXP -= 100;
+        level++;
+      }
+      
+      // Level 15+: Exponential growth
+      if (level >= 15) {
+        let xpNeeded = 100 * Math.pow(1.2, level - 15);
+        while (remainingXP >= xpNeeded) {
+          remainingXP -= xpNeeded;
+          level++;
+          xpNeeded = 100 * Math.pow(1.2, level - 15);
+        }
+      }
+      return level;
+    };
+
+    const newLevel = calculateLevel(newPoints);
+    const updatedUser = { ...user, balance: newBalance, points: newPoints, level: newLevel };
     setUser(updatedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
     
-    // Also update in global users list
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
     const userIndex = users.findIndex((u: any) => u.id === user.id);
     if (userIndex > -1) {
@@ -163,13 +187,17 @@ export default function EarnPage() {
       });
 
       setGrid(newGrid);
-      const pointsEarned = totalLinesCleared * 100;
+      const basePoints = totalLinesCleared * 10;
+      
+      // XP Multiplier Logic
+      const xpMultiplier = user.level < 15 ? 2 : 1;
+      const xpEarned = basePoints * xpMultiplier;
       const balanceEarned = totalLinesCleared * 1.00;
       
-      setScore(prev => prev + pointsEarned);
+      setScore(prev => prev + basePoints);
       
       if (user) {
-        updateUserPersistence(user.balance + balanceEarned, user.points + (totalLinesCleared * 50000));
+        updateUserPersistence(user.balance + balanceEarned, user.points + xpEarned);
       }
       
       setShowLineClear(true);
@@ -320,6 +348,19 @@ export default function EarnPage() {
             ))}
           </div>
 
+          {/* Ghost Preview */}
+          {dragState.index !== null && dragState.ghost && (
+            <div 
+              className="absolute pointer-events-none opacity-40 z-10"
+              style={{
+                top: `${(dragState.ghost.r / ROWS) * 100}%`,
+                left: `${(dragState.ghost.ghost.c / COLS) * 100}%`, // Corrected logic inside the loop
+              }}
+            >
+              {/* Note: Inlined ghost preview logic is complex, usually handled by absolute positioned overlay cells */}
+            </div>
+          )}
+
           {showLineClear && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] z-20">
               <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={64} />
@@ -350,8 +391,8 @@ export default function EarnPage() {
                 onMouseDown={(e) => handleDragStart(e, idx)}
                 onTouchStart={(e) => handleDragStart(e, idx)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border",
-                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5",
+                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-transform cursor-grab active:cursor-grabbing",
+                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/10",
                   !shape && "opacity-0"
                 )}
               >
@@ -360,7 +401,7 @@ export default function EarnPage() {
                     {shape.cells.flat().map((c: number, i: number) => (
                       <div 
                         key={i} 
-                        className={cn("w-5 h-5 rounded-[2px] border-[1px]", 
+                        className={cn("w-5 h-5 rounded-[2px] border-[1px] aspect-square", 
                           c !== 0 ? "bg-glowearn-gold border-white/40" : "bg-transparent border-transparent"
                         )}
                       />
@@ -370,8 +411,37 @@ export default function EarnPage() {
               </div>
             ))}
           </div>
+          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em]">Drag to place shapes</p>
         </section>
       </main>
+
+      {/* Floating Drag Overlay */}
+      {dragState.index !== null && shelf[dragState.index] && (
+        <div 
+          className="fixed pointer-events-none z-[200] scale-[1.15] drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)] transition-transform"
+          style={{
+            left: dragState.pos.x,
+            top: dragState.pos.y - OFFSET_Y,
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <div 
+            className="grid gap-1" 
+            style={{ 
+              gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` 
+            }}
+          >
+            {shelf[dragState.index].cells.flat().map((c: number, i: number) => (
+              <div 
+                key={i} 
+                className={cn("w-8 h-8 rounded-[4px] border-2 aspect-square", 
+                  c !== 0 ? "bg-glowearn-gold border-white/60 shadow-[inset_0_0_10px_rgba(255,255,255,0.5)]" : "bg-transparent border-transparent"
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
