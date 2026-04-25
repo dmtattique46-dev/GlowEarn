@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -27,6 +28,11 @@ export default function EarnPage() {
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
   
+  // Coin Logic State
+  const [coins, setCoins] = useState(20.00); // USD Balance
+  const [coinCount, setCoinCount] = useState(1000000); // Integer Coins
+  const [showCoinsAnim, setShowCoinsAnim] = useState(false);
+
   // Drag State
   const [dragState, setDragState] = useState<{
     index: number | null;
@@ -35,7 +41,6 @@ export default function EarnPage() {
   }>({ index: null, pos: { x: 0, y: 0 }, ghost: null });
 
   const boardRef = useRef<HTMLDivElement>(null);
-  const shelfRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Initialize game on mount
   useEffect(() => {
@@ -96,7 +101,9 @@ export default function EarnPage() {
       if (full) colsToClear.push(c);
     }
 
-    if (rowsToClear.length > 0 || colsToClear.length > 0) {
+    const totalLinesCleared = rowsToClear.length + colsToClear.length;
+
+    if (totalLinesCleared > 0) {
       const newGrid = currentGrid.map(row => [...row]);
       rowsToClear.forEach(r => {
         for (let c = 0; c < COLS; c++) newGrid[r][c] = 0;
@@ -106,10 +113,18 @@ export default function EarnPage() {
       });
 
       setGrid(newGrid);
-      setScore(prev => prev + (rowsToClear.length + colsToClear.length) * 100);
+      setScore(prev => prev + totalLinesCleared * 100);
+      
+      // Update Balance Logic
+      setCoins(prev => parseFloat((prev + (totalLinesCleared * 1.00)).toFixed(2)));
+      setCoinCount(prev => prev + (totalLinesCleared * 50000)); // Every $1 is 50k coins in this reward loop
+      
       setShowLineClear(true);
+      setShowCoinsAnim(true);
       triggerHaptic([100, 50, 100]);
+      
       setTimeout(() => setShowLineClear(false), 2000);
+      setTimeout(() => setShowCoinsAnim(false), 1500);
     }
   };
 
@@ -238,7 +253,7 @@ export default function EarnPage() {
   return (
     <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden select-none touch-none">
       <FloatingElements />
-      <Header />
+      <Header usdBalance={coins} coinCount={coinCount} animate={showCoinsAnim} />
       
       <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
         {/* Bonus Banner */}

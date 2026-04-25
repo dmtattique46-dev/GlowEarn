@@ -1,11 +1,18 @@
+
 "use client"
 
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from 'next/navigation';
-import { CircleDollarSign } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export function Header() {
+interface HeaderProps {
+  usdBalance?: number;
+  coinCount?: number;
+  animate?: boolean;
+}
+
+export function Header({ usdBalance = 20.00, coinCount = 1000000, animate = false }: HeaderProps) {
   const router = useRouter();
 
   return (
@@ -25,12 +32,20 @@ export function Header() {
           </div>
         </div>
 
-        <div className="glass-box p-2.5 px-4 rounded-2xl flex flex-col items-end gap-0.5">
+        <div className={cn(
+          "glass-box p-2.5 px-4 rounded-2xl flex flex-col items-end gap-0.5 transition-all duration-300",
+          animate && "scale-110 border-glowearn-gold shadow-[0_0_20px_rgba(250,219,59,0.4)]"
+        )}>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-glowearn-gold shadow-[0_0_5px_#fadb3b]"></div>
-            <span className="text-white font-black text-xs">$20.00 USD</span>
+            <div className={cn(
+              "w-2 h-2 rounded-full bg-glowearn-gold shadow-[0_0_5px_#fadb3b]",
+              animate && "animate-ping"
+            )}></div>
+            <span className="text-white font-black text-xs">${usdBalance.toFixed(2)} USD</span>
           </div>
-          <span className="text-glowearn-gold font-bold text-[10px] uppercase tracking-wider">1,000,000 Coins</span>
+          <span className="text-glowearn-gold font-bold text-[10px] uppercase tracking-wider">
+            {Math.floor(coinCount).toLocaleString()} Coins
+          </span>
         </div>
       </div>
     </header>
