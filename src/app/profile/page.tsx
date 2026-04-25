@@ -8,8 +8,9 @@ import { FloatingElements } from '@/components/background/FloatingElements';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Puzzle, LogOut, ChevronRight, Trophy } from 'lucide-react';
+import { Sparkles, LogOut, ChevronRight, Trophy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const router = useRouter();
