@@ -5,13 +5,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, MousePointer2, Trophy, RotateCcw } from 'lucide-react';
+import { Sparkles, Trophy, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 // Game Constants
 const ROWS = 8;
 const COLS = 8;
+const OFFSET_Y = 80;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -22,8 +23,6 @@ const SHAPES = [
   { id: 'i-shape', cells: [[4, 4, 4, 4]], color: 4 },
   { id: 'z-shape', cells: [[5, 5, 0], [0, 5, 5]], color: 5 },
 ];
-
-const OFFSET_Y = 80;
 
 export default function EarnPage() {
   const router = useRouter();
@@ -61,14 +60,10 @@ export default function EarnPage() {
     const calculateLevel = (totalXP: number) => {
       let level = 1;
       let remainingXP = totalXP;
-      
-      // Level 1-15: 100 XP each
       while (level < 15 && remainingXP >= 100) {
         remainingXP -= 100;
         level++;
       }
-      
-      // Level 15+: Exponential growth
       if (level >= 15) {
         let xpNeeded = 100 * Math.pow(1.2, level - 15);
         while (remainingXP >= xpNeeded) {
@@ -115,7 +110,6 @@ export default function EarnPage() {
   };
 
   const canPlaceShape = useCallback((r: number, c: number, shapeCells: number[][], currentGrid: BlockType[][]) => {
-    let hasValidCell = false;
     for (let dr = 0; dr < shapeCells.length; dr++) {
       for (let dc = 0; dc < shapeCells[dr].length; dc++) {
         if (shapeCells[dr][dc] !== 0) {
@@ -124,90 +118,24 @@ export default function EarnPage() {
           if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || currentGrid[nr][nc] !== 0) {
             return false;
           }
-          hasValidCell = true;
         }
       }
     }
-    return hasValidCell;
+    return true;
   }, []);
 
   const checkGameOver = useCallback((currentGrid: BlockType[][], currentShelf: (any | null)[]) => {
-    const hasMoves = currentShelf.some((shape) => {
+    const hasAnyMove = currentShelf.some((shape) => {
       if (!shape) return false;
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          if (canPlaceShape(r, c, shape.cells, currentGrid)) {
-            return true;
-          }
+      for (let r = 0; r <= ROWS - shape.cells.length; r++) {
+        for (let c = 0; c <= COLS - shape.cells[0].length; c++) {
+          if (canPlaceShape(r, c, shape.cells, currentGrid)) return true;
         }
       }
       return false;
     });
-    return !hasMoves;
+    return !hasAnyMove;
   }, [canPlaceShape]);
-
-  useEffect(() => {
-    if (shelf.some(s => s !== null) && !isGameOver) {
-      const isOver = checkGameOver(grid, shelf);
-      if (isOver) {
-        setIsGameOver(true);
-        triggerHaptic([200, 100, 200]);
-      }
-    }
-  }, [grid, shelf, isGameOver, checkGameOver]);
-
-  const checkLineClear = (currentGrid: BlockType[][]) => {
-    const rowsToClear: number[] = [];
-    const colsToClear: number[] = [];
-
-    for (let r = 0; r < ROWS; r++) {
-      if (currentGrid[r].every(cell => cell !== 0)) rowsToClear.push(r);
-    }
-
-    for (let c = 0; c < COLS; c++) {
-      let full = true;
-      for (let r = 0; r < ROWS; r++) {
-        if (currentGrid[r][c] === 0) {
-          full = false;
-          break;
-        }
-      }
-      if (full) colsToClear.push(c);
-    }
-
-    const totalLinesCleared = rowsToClear.length + colsToClear.length;
-
-    if (totalLinesCleared > 0) {
-      const newGrid = currentGrid.map(row => [...row]);
-      rowsToClear.forEach(r => {
-        for (let c = 0; c < COLS; c++) newGrid[r][c] = 0;
-      });
-      colsToClear.forEach(c => {
-        for (let r = 0; r < ROWS; r++) newGrid[r][c] = 0;
-      });
-
-      setGrid(newGrid);
-      const basePoints = totalLinesCleared * 10;
-      
-      // XP Multiplier Logic
-      const xpMultiplier = user.level < 15 ? 2 : 1;
-      const xpEarned = basePoints * xpMultiplier;
-      const balanceEarned = totalLinesCleared * 1.00;
-      
-      setScore(prev => prev + basePoints);
-      
-      if (user) {
-        updateUserPersistence(user.balance + balanceEarned, user.points + xpEarned);
-      }
-      
-      setShowLineClear(true);
-      setShowCoinsAnim(true);
-      triggerHaptic([100, 50, 100]);
-      
-      setTimeout(() => setShowLineClear(false), 2000);
-      setTimeout(() => setShowCoinsAnim(false), 1500);
-    }
-  };
 
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     if (!shelf[index] || isGameOver) return;
@@ -231,22 +159,22 @@ export default function EarnPage() {
     let newGhost: { r: number; c: number } | null = null;
     if (boardRef.current) {
       const rect = boardRef.current.getBoundingClientRect();
-      const cellSize = rect.width / COLS;
+      const cellSize = (rect.width - 16) / COLS; // Adjusting for p-2 padding
       const shape = shelf[dragState.index];
       
       const visualX = clientX;
       const visualY = clientY - OFFSET_Y;
 
-      const localX = visualX - rect.left;
-      const localY = visualY - rect.top;
+      const gridX = visualX - rect.left - 8;
+      const gridY = visualY - rect.top - 8;
 
-      const shapeWidth = shape.cells[0].length * cellSize;
-      const shapeHeight = shape.cells.length * cellSize;
+      const shapeHalfWidth = (shape.cells[0].length * cellSize) / 2;
+      const shapeHalfHeight = (shape.cells.length * cellSize) / 2;
 
-      const c = Math.round((localX - shapeWidth / 2) / cellSize);
-      const r = Math.round((localY - shapeHeight / 2) / cellSize);
+      const c = Math.round((gridX - shapeHalfWidth) / cellSize);
+      const r = Math.round((gridY - shapeHalfHeight) / cellSize);
 
-      if (r >= -2 && r < ROWS && c >= -2 && c < COLS) {
+      if (r >= 0 && r <= ROWS - shape.cells.length && c >= 0 && c <= COLS - shape.cells[0].length) {
         if (canPlaceShape(r, c, shape.cells, grid)) {
           newGhost = { r, c };
         }
@@ -276,21 +204,48 @@ export default function EarnPage() {
         });
       });
 
-      setGrid(newGrid);
-      checkLineClear(newGrid);
-      triggerHaptic(50);
+      // Clear Lines Logic
+      const rowsToClear: number[] = [];
+      const colsToClear: number[] = [];
+      for (let ir = 0; ir < ROWS; ir++) if (newGrid[ir].every(cell => cell !== 0)) rowsToClear.push(ir);
+      for (let ic = 0; ic < COLS; ic++) {
+        let full = true;
+        for (let ir = 0; ir < ROWS; ir++) if (newGrid[ir][ic] === 0) { full = false; break; }
+        if (full) colsToClear.push(ic);
+      }
 
+      const totalLines = rowsToClear.length + colsToClear.length;
+      if (totalLines > 0) {
+        rowsToClear.forEach(ri => newGrid[ri].fill(0));
+        colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
+        
+        const xpMultiplier = user.level < 15 ? 2 : 1;
+        const xpEarned = totalLines * 20 * xpMultiplier;
+        const balanceEarned = totalLines * 1.00;
+        
+        setScore(prev => prev + (totalLines * 100));
+        updateUserPersistence(user.balance + balanceEarned, user.points + xpEarned);
+        
+        setShowLineClear(true);
+        setShowCoinsAnim(true);
+        setTimeout(() => { setShowLineClear(false); setShowCoinsAnim(false); }, 1500);
+        triggerHaptic([100, 50, 100]);
+      }
+
+      setGrid(newGrid);
       const newShelf = [...shelf];
       newShelf[dragState.index] = null;
-      if (newShelf.every(s => s === null)) {
-        refillShelf();
-      } else {
-        setShelf(newShelf);
+      if (newShelf.every(s => s === null)) refillShelf();
+      else setShelf(newShelf);
+
+      // Check Game Over
+      if (checkGameOver(newGrid, newShelf.every(s => s === null) ? SHAPES : newShelf)) {
+        setIsGameOver(true);
       }
     }
 
     setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-  }, [dragState, shelf, grid]);
+  }, [dragState, shelf, grid, user, checkGameOver]);
 
   useEffect(() => {
     if (dragState.index !== null) {
@@ -317,7 +272,7 @@ export default function EarnPage() {
       <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
         <div className="text-center space-y-1">
           <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
-            GLOW BLOCK PUZZLE
+            GLOW PUZZLE
           </h1>
           <div className="flex items-center justify-center gap-2">
             <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Score:</span>
@@ -331,51 +286,47 @@ export default function EarnPage() {
         >
           <div className="grid grid-cols-8 gap-1 h-full w-full">
             {grid.map((row, r) => (
-              row.map((cell, c) => (
-                <div 
-                  key={`${r}-${c}`}
-                  className={cn(
-                    "aspect-square w-full rounded-sm border transition-all duration-300",
-                    cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                    cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                    cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                    cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                    cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                    cell === 0 && "bg-white/5 border-white/5"
-                  )}
-                />
-              ))
+              row.map((cell, c) => {
+                const shape = dragState.index !== null ? shelf[dragState.index] : null;
+                const isGhost = dragState.ghost && shape && 
+                                r >= dragState.ghost.r && r < dragState.ghost.r + shape.cells.length &&
+                                c >= dragState.ghost.c && c < dragState.ghost.c + shape.cells[0].length &&
+                                shape.cells[r - dragState.ghost.r][c - dragState.ghost.c] !== 0;
+
+                return (
+                  <div 
+                    key={`${r}-${c}`}
+                    className={cn(
+                      "aspect-square w-full rounded-sm border transition-all duration-200",
+                      cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                      cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                      cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                      cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                      cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                      cell === 0 && !isGhost && "bg-white/5 border-white/5",
+                      isGhost && "bg-yellow-500/20 border-yellow-500/50 scale-[0.95]"
+                    )}
+                  />
+                );
+              })
             ))}
           </div>
 
-          {/* Ghost Preview */}
-          {dragState.index !== null && dragState.ghost && (
-            <div 
-              className="absolute pointer-events-none opacity-40 z-10"
-              style={{
-                top: `${(dragState.ghost.r / ROWS) * 100}%`,
-                left: `${(dragState.ghost.ghost.c / COLS) * 100}%`, // Corrected logic inside the loop
-              }}
-            >
-              {/* Note: Inlined ghost preview logic is complex, usually handled by absolute positioned overlay cells */}
-            </div>
-          )}
-
           {showLineClear && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] z-20">
-              <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={64} />
-              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter">LINE CLEAR!</h2>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[1.5rem] z-20 animate-in zoom-in duration-300">
+              <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
+              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">LINE CLEAR!</h2>
             </div>
           )}
 
           {isGameOver && (
-            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem]">
-              <Trophy className="text-glowearn-gold w-16 h-16 animate-bounce mb-4" />
+            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
+              <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
               <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
               <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Score: {score}</p>
               <button 
                 onClick={resetGame}
-                className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2"
+                className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
               >
                 <RotateCcw size={20} /> Play Again
               </button>
@@ -384,25 +335,25 @@ export default function EarnPage() {
         </div>
 
         <section className={cn("w-full space-y-4 pt-2", isGameOver && "opacity-20 pointer-events-none")}>
-          <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5">
+          <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 shadow-inner">
             {shelf.map((shape, idx) => (
               <div 
                 key={idx}
                 onMouseDown={(e) => handleDragStart(e, idx)}
                 onTouchStart={(e) => handleDragStart(e, idx)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-transform cursor-grab active:cursor-grabbing",
-                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/10",
-                  !shape && "opacity-0"
+                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-all cursor-grab active:cursor-grabbing",
+                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/20 hover:bg-white/5",
+                  !shape && "opacity-0 pointer-events-none"
                 )}
               >
                 {shape && (
-                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
+                  <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
                     {shape.cells.flat().map((c: number, i: number) => (
                       <div 
                         key={i} 
-                        className={cn("w-5 h-5 rounded-[2px] border-[1px] aspect-square", 
-                          c !== 0 ? "bg-glowearn-gold border-white/40" : "bg-transparent border-transparent"
+                        className={cn("w-5 h-5 aspect-square rounded-[2px] border-[1px]", 
+                          c !== 0 ? "bg-glowearn-gold border-white/40 shadow-sm" : "bg-transparent border-transparent"
                         )}
                       />
                     ))}
@@ -411,14 +362,14 @@ export default function EarnPage() {
               </div>
             ))}
           </div>
-          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em]">Drag to place shapes</p>
+          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to place shapes</p>
         </section>
       </main>
 
-      {/* Floating Drag Overlay */}
+      {/* Drag Overlay */}
       {dragState.index !== null && shelf[dragState.index] && (
         <div 
-          className="fixed pointer-events-none z-[200] scale-[1.15] drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)] transition-transform"
+          className="fixed pointer-events-none z-[200] scale-[1.2] drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]"
           style={{
             left: dragState.pos.x,
             top: dragState.pos.y - OFFSET_Y,
@@ -427,9 +378,7 @@ export default function EarnPage() {
         >
           <div 
             className="grid gap-1" 
-            style={{ 
-              gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` 
-            }}
+            style={{ gridTemplateColumns: `repeat(${shelf[dragState.index].cells[0].length}, minmax(0, 1fr))` }}
           >
             {shelf[dragState.index].cells.flat().map((c: number, i: number) => (
               <div 
