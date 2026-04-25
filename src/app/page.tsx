@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from 'react';
@@ -20,7 +21,7 @@ export default function Home() {
         const result = await aiEarningRecommendations({
           userId: "user-123",
           userProfile: "Ambitious earner, likes surveys and quick tasks, active daily.",
-          userActivityHistory: "Completed 5 surveys yesterday, total earnings $24.50. High engagement in gaming offers."
+          userActivityHistory: "New account, just started. Looking to maximize early earnings."
         });
         setRecommendations(result);
       } catch (error) {
@@ -35,10 +36,9 @@ export default function Home() {
   return (
     <div className="relative min-h-screen pb-24 pt-20">
       <FloatingElements />
-      <Header />
+      <Header usdBalance={0} coinCount={0} />
       
       <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-6">
-        {/* Welcome Section */}
         <section className="mt-4">
           <h2 className="text-white font-headline text-2xl font-black uppercase tracking-tight">
             Hello, <span className="text-glowearn-gold">Glow Earner!</span>
@@ -46,7 +46,6 @@ export default function Home() {
           <p className="text-white/60 text-sm mt-1">Your daily potential is glowing today.</p>
         </section>
 
-        {/* Dashboard Stats */}
         <div className="grid grid-cols-2 gap-4">
           <Card className="bg-white/5 border-glowearn-gold/20 backdrop-blur-md rounded-2xl overflow-hidden">
             <CardContent className="p-4 flex flex-col items-center">
@@ -54,7 +53,7 @@ export default function Home() {
                 <DollarSign className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Earnings</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">$20.00</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">$0.00</span>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-glowearn-gold/20 backdrop-blur-md rounded-2xl overflow-hidden">
@@ -63,12 +62,11 @@ export default function Home() {
                 <TrendingUp className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Rank</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">#1</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">#---</span>
             </CardContent>
           </Card>
         </div>
 
-        {/* AI Recommendations Section */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 px-1">
             <Sparkles className="text-glowearn-gold" size={18} />
@@ -107,7 +105,6 @@ export default function Home() {
           </Card>
         </section>
 
-        {/* Quick Actions / Active Tasks */}
         <section className="space-y-4">
           <h3 className="text-white/40 font-bold uppercase tracking-widest text-xs px-1">Trending Opportunities</h3>
           {[

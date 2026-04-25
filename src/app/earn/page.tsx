@@ -31,9 +31,9 @@ export default function EarnPage() {
   const [showLineClear, setShowLineClear] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   
-  // Coin Logic State
-  const [coins, setCoins] = useState(20.00); // USD Balance
-  const [coinCount, setCoinCount] = useState(1000000); // Integer Coins
+  // Coin Logic State - Reset to Zero
+  const [coins, setCoins] = useState(0.00); // USD Balance
+  const [coinCount, setCoinCount] = useState(0); // Integer Coins
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
 
   // Drag State
@@ -91,7 +91,6 @@ export default function EarnPage() {
   const checkGameOver = useCallback((currentGrid: BlockType[][], currentShelf: (any | null)[]) => {
     const hasMoves = currentShelf.some((shape) => {
       if (!shape) return false;
-      // Try every possible cell on the grid for this shape
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           if (canPlaceShape(r, c, shape.cells, currentGrid)) {
@@ -104,7 +103,6 @@ export default function EarnPage() {
     return !hasMoves;
   }, [canPlaceShape]);
 
-  // Check Game Over whenever grid or shelf changes
   useEffect(() => {
     if (shelf.some(s => s !== null) && !isGameOver) {
       const isOver = checkGameOver(grid, shelf);
@@ -290,7 +288,6 @@ export default function EarnPage() {
       <Header usdBalance={coins} coinCount={coinCount} animate={showCoinsAnim} />
       
       <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
-        {/* Bonus Banner */}
         <div className="w-full bg-glowearn-forest/20 border border-glowearn-forest/40 rounded-2xl py-3 px-4 flex items-center justify-between animate-pulse">
           <div className="flex items-center gap-2">
             <Sparkles className="text-glowearn-gold" size={16} />
@@ -298,7 +295,6 @@ export default function EarnPage() {
           </div>
         </div>
 
-        {/* Game Title */}
         <div className="text-center space-y-1">
           <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
             GLOW BLOCK PUZZLE
@@ -309,7 +305,6 @@ export default function EarnPage() {
           </div>
         </div>
 
-        {/* Game Board */}
         <div 
           ref={boardRef}
           className="w-full max-w-[400px] aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative"
@@ -332,7 +327,6 @@ export default function EarnPage() {
             ))}
           </div>
 
-          {/* Line Clear Overlay */}
           {showLineClear && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/60 backdrop-blur-md rounded-[1.5rem] animate-in fade-in zoom-in duration-300 z-20">
               <div className="relative">
@@ -346,7 +340,6 @@ export default function EarnPage() {
             </div>
           )}
 
-          {/* Game Over Overlay */}
           {isGameOver && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
               <div className="text-center space-y-6 px-8">
@@ -379,7 +372,6 @@ export default function EarnPage() {
           )}
         </div>
 
-        {/* Floating Dragged Block */}
         {dragState.index !== null && shelf[dragState.index] && (
           <div 
             className="fixed pointer-events-none z-[100]"
@@ -403,11 +395,9 @@ export default function EarnPage() {
                 />
               ))}
             </div>
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full h-6 bg-glowearn-gold/10 blur-2xl rounded-full scale-150" />
           </div>
         )}
 
-        {/* Shape Shelf */}
         <section className={cn("w-full space-y-4 pt-2 transition-opacity duration-500", isGameOver && "opacity-20 pointer-events-none")}>
           <div className="flex flex-col items-center gap-4">
              <div className="flex items-center gap-2 text-white/40">
@@ -445,14 +435,6 @@ export default function EarnPage() {
              </div>
           </div>
         </section>
-
-        {/* Background Gear Pattern Decorations */}
-        <div className="fixed bottom-24 -left-12 opacity-5 pointer-events-none">
-          <div className="w-48 h-48 border-8 border-glowearn-gold rounded-full border-dashed animate-[spin_20s_linear_infinite]" />
-        </div>
-        <div className="fixed bottom-40 -right-12 opacity-5 pointer-events-none">
-          <div className="w-64 h-64 border-8 border-glowearn-gold rounded-full border-dashed animate-[spin_30s_linear_infinite_reverse]" />
-        </div>
       </main>
 
       <BottomNav />

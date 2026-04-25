@@ -12,7 +12,7 @@ interface HeaderProps {
   animate?: boolean;
 }
 
-export function Header({ usdBalance = 20.00, coinCount = 1000000, animate = false }: HeaderProps) {
+export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: HeaderProps) {
   const router = useRouter();
 
   return (
