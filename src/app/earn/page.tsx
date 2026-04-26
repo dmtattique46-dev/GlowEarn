@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, Trophy, RotateCcw } from 'lucide-react';
+import { Sparkles, Trophy, RotateCcw, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
@@ -31,6 +31,7 @@ export default function EarnPage() {
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
+  const [showLevelUp, setShowLevelUp] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
 
@@ -53,29 +54,41 @@ export default function EarnPage() {
     }
   }, [router]);
 
+  const calculateLevel = (totalPoints: number) => {
+    let level = 1;
+    let xp = totalPoints;
+    let req = 500;
+
+    // Levels 1-15: 500 XP each
+    while (level < 15 && xp >= 500) {
+      xp -= 500;
+      level++;
+    }
+
+    // Level 15+: 20% increase each time
+    if (level >= 15) {
+      req = 500;
+      while (xp >= req) {
+        xp -= req;
+        level++;
+        req = Math.floor(req * 1.2);
+      }
+    }
+    return level;
+  };
+
   const updateUserPersistence = (newBalance: number, newPoints: number) => {
     if (!user) return;
     
-    // Leveling Logic
-    const calculateLevel = (totalXP: number) => {
-      let level = 1;
-      let remainingXP = totalXP;
-      while (level < 15 && remainingXP >= 100) {
-        remainingXP -= 100;
-        level++;
-      }
-      if (level >= 15) {
-        let xpNeeded = 100 * Math.pow(1.2, level - 15);
-        while (remainingXP >= xpNeeded) {
-          remainingXP -= xpNeeded;
-          level++;
-          xpNeeded = 100 * Math.pow(1.2, level - 15);
-        }
-      }
-      return level;
-    };
-
     const newLevel = calculateLevel(newPoints);
+    const oldLevel = user.level || 1;
+
+    if (newLevel > oldLevel) {
+      setShowLevelUp(true);
+      triggerHaptic([200, 100, 200]);
+      setTimeout(() => setShowLevelUp(false), 3000);
+    }
+
     const updatedUser = { ...user, balance: newBalance, points: newPoints, level: newLevel };
     setUser(updatedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
@@ -217,13 +230,12 @@ export default function EarnPage() {
       const totalLines = rowsToClear.length + colsToClear.length;
       if (totalLines > 0) {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
-        colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ir++) newGrid[ri][ci] = 0; });
+        colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        // Simplified Earning: Coins only (+100 per line)
+        // Earning Logic: Only Coins (Points) during gameplay
         const coinReward = totalLines * 100;
         
         setScore(prev => prev + coinReward);
-        // Keep USD balance static, update only coins (points)
         updateUserPersistence(user.balance, user.points + coinReward);
         
         setShowLineClear(true);
@@ -239,13 +251,14 @@ export default function EarnPage() {
       else setShelf(newShelf);
 
       // Check Game Over
-      if (checkGameOver(newGrid, newShelf.every(s => s === null) ? SHAPES : newShelf)) {
+      const currentAvailableShelf = newShelf.every(s => s === null) ? SHAPES : newShelf;
+      if (checkGameOver(newGrid, currentAvailableShelf)) {
         setIsGameOver(true);
       }
     }
 
     setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-  }, [dragState, shelf, grid, user, checkGameOver]);
+  }, [dragState, shelf, grid, user, checkGameOver, updateUserPersistence]);
 
   useEffect(() => {
     if (dragState.index !== null) {
@@ -316,6 +329,14 @@ export default function EarnPage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[1.5rem] z-20 animate-in zoom-in duration-300">
               <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
               <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">LINE CLEAR!</h2>
+            </div>
+          )}
+
+          {showLevelUp && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-[1.5rem] z-[150] animate-in zoom-in duration-500">
+              <Zap className="text-glowearn-gold animate-pulse mb-2 fill-glowearn-gold" size={64} />
+              <h2 className="text-white font-headline text-5xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_20px_#fadb3b]">LEVEL UP!</h2>
+              <p className="text-glowearn-gold font-bold uppercase tracking-[0.3em] mt-2">New Mastery Unlocked</p>
             </div>
           )}
 

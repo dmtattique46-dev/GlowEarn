@@ -20,28 +20,30 @@ export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: He
   const levelingData = useMemo(() => {
     let level = 1;
     let xp = coinCount;
-    let xpForNext = 100;
+    let req = 500;
     
-    // Fast Track 1-15
-    while (level < 15 && xp >= 100) {
-      xp -= 100;
+    // Levels 1-15: 500 XP step
+    while (level < 15 && xp >= 500) {
+      xp -= 500;
       level++;
     }
     
-    // Exponential 15+
+    // Level 15+: Exponential growth
     if (level >= 15) {
-      xpForNext = 100 * Math.pow(1.2, level - 15);
-      while (xp >= xpForNext) {
-        xp -= xpForNext;
+      req = 500;
+      while (xp >= req) {
+        xp -= req;
         level++;
-        xpForNext = 100 * Math.pow(1.2, level - 15);
+        req = Math.floor(req * 1.2);
       }
     }
     
     return {
       level,
-      progress: (xp / xpForNext) * 100,
-      isPro: level >= 15
+      progress: (xp / req) * 100,
+      isPro: level >= 15,
+      xpInLevel: Math.floor(xp),
+      xpRequired: req
     };
   }, [coinCount]);
 
@@ -82,10 +84,10 @@ export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: He
 
                   {/* XP Tooltip */}
                   {showXpTooltip && (
-                    <div className="absolute top-full left-0 mt-2 z-[60] bg-black/95 border border-glowearn-gold/40 rounded-lg px-3 py-2 backdrop-blur-xl shadow-[0_0_20px_rgba(250,219,59,0.3)] animate-in fade-in zoom-in duration-200 min-w-[100px]">
+                    <div className="absolute top-full left-0 mt-2 z-[60] bg-black/95 border border-glowearn-gold/40 rounded-lg px-3 py-2 backdrop-blur-xl shadow-[0_0_20px_rgba(250,219,59,0.3)] animate-in fade-in zoom-in duration-200 min-w-[120px]">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-glowearn-gold font-black text-[10px] uppercase tracking-widest whitespace-nowrap">
-                          Total XP: {Math.floor(coinCount).toLocaleString()}
+                          XP: {levelingData.xpInLevel} / {levelingData.xpRequired}
                         </span>
                         <div className="h-0.5 w-full bg-glowearn-gold/20 rounded-full overflow-hidden">
                           <div className="h-full bg-glowearn-gold" style={{ width: `${levelingData.progress}%` }}></div>
@@ -98,7 +100,7 @@ export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: He
             </div>
           </div>
 
-          {/* Balance Card Updated */}
+          {/* Balance Card */}
           <div className={cn(
             "glass-box p-2.5 px-4 rounded-2xl flex flex-col items-end gap-0.5 transition-all duration-300 min-w-[100px]",
             animate && "scale-110 border-glowearn-gold shadow-[0_0_20px_rgba(250,219,59,0.4)]"

@@ -33,29 +33,29 @@ export default function ProfilePage() {
   const leveling = useMemo(() => {
     if (!user) return null;
     let level = 1;
-    let xp = user.points;
-    let xpForNext = 100;
+    let xp = user.points || 0;
+    let req = 500;
     
-    // Fast Track 1-15
-    while (level < 15 && xp >= 100) {
-      xp -= 100;
+    // Fast Track 1-15: 500 XP steps
+    while (level < 15 && xp >= 500) {
+      xp -= 500;
       level++;
     }
     
-    // Exponential 15+
+    // Exponential 15+: 20% growth
     if (level >= 15) {
-      xpForNext = 100 * Math.pow(1.2, level - 15);
-      while (xp >= xpForNext) {
-        xp -= xpForNext;
+      req = 500;
+      while (xp >= req) {
+        xp -= req;
         level++;
-        xpForNext = 100 * Math.pow(1.2, level - 15);
+        req = Math.floor(req * 1.2);
       }
     }
     
     return {
       level,
       xp,
-      xpForNext,
+      xpForNext: req,
       isMaster: level >= 15
     };
   }, [user]);
