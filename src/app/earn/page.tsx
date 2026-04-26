@@ -159,7 +159,7 @@ export default function EarnPage() {
     let newGhost: { r: number; c: number } | null = null;
     if (boardRef.current) {
       const rect = boardRef.current.getBoundingClientRect();
-      const cellSize = (rect.width - 16) / COLS; // Adjusting for p-2 padding
+      const cellSize = (rect.width - 16) / COLS;
       const shape = shelf[dragState.index];
       
       const visualX = clientX;
@@ -217,14 +217,14 @@ export default function EarnPage() {
       const totalLines = rowsToClear.length + colsToClear.length;
       if (totalLines > 0) {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
-        colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
+        colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ir++) newGrid[ri][ci] = 0; });
         
-        const xpMultiplier = user.level < 15 ? 2 : 1;
-        const xpEarned = totalLines * 20 * xpMultiplier;
-        const balanceEarned = totalLines * 1.00;
+        // Simplified Earning: Coins only (+100 per line)
+        const coinReward = totalLines * 100;
         
-        setScore(prev => prev + (totalLines * 100));
-        updateUserPersistence(user.balance + balanceEarned, user.points + xpEarned);
+        setScore(prev => prev + coinReward);
+        // Keep USD balance static, update only coins (points)
+        updateUserPersistence(user.balance, user.points + coinReward);
         
         setShowLineClear(true);
         setShowCoinsAnim(true);
