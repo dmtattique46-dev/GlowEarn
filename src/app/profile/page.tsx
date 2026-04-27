@@ -34,6 +34,17 @@ export default function ProfilePage() {
 
   const leveling = useMemo(() => {
     if (!user) return null;
+
+    // Developer Master Override
+    if (user.isAdmin) {
+      return {
+        level: 100,
+        currentXp: 999999,
+        xpForNext: 999999,
+        isMaster: true
+      };
+    }
+
     let level = 1;
     let currentXp = user.xp || 0;
     let req = 500;
@@ -66,20 +77,25 @@ export default function ProfilePage() {
 
   const dailyGoals = [
     { label: "Coins Collected Today:", progress: Math.min((user.points / 1000) * 100, 100), current: user.points, total: 1000 },
-    { label: "XP Status:", progress: 0, current: 0, total: 1, subText: "Complete Events to earn XP" },
-    { label: "Master Progress:", progress: leveling.isMaster ? (leveling.level / 50) * 100 : 0, current: leveling.level, total: 50 },
+    { label: "XP Status:", progress: leveling.isMaster ? 100 : 0, current: leveling.isMaster ? 1 : 0, total: 1, subText: "Complete Events to earn XP" },
+    { label: "Master Progress:", progress: leveling.isMaster ? (leveling.level / 100) * 100 : 0, current: leveling.level, total: 100 },
   ];
 
   const stats = [
-    { label: "Total XP Collected:", value: (user.xp || 0).toLocaleString() },
+    { label: "Total XP Collected:", value: user.isAdmin ? "UNLIMITED" : (user.xp || 0).toLocaleString() },
     { label: "Coins Wallet:", value: user.points.toLocaleString() },
-    { label: "Current Rank:", value: leveling.isMaster ? "Glow Master" : "Novice Earner" },
+    { label: "Current Rank:", value: leveling.isMaster ? (user.isAdmin ? "System Master" : "Glow Master") : "Novice Earner" },
   ];
 
   return (
     <div className="relative min-h-screen pb-24 pt-24 bg-[#081926]">
       <FloatingElements />
-      <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} />
+      <Header 
+        usdBalance={user.balance} 
+        coinCount={user.points} 
+        xp={user.xp || 0} 
+        isAdmin={user.isAdmin}
+      />
       
       <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-8 mt-6">
         <header className="flex flex-col items-center">
@@ -98,7 +114,7 @@ export default function ProfilePage() {
             {leveling.isMaster && (
               <div className="absolute -right-12 top-4 flex items-center gap-1 bg-glowearn-gold px-2 py-1 rounded-full border border-glowearn-gold/20 shadow-lg">
                 <Trophy size={10} className="text-glowearn-navy fill-glowearn-navy" />
-                <span className="text-glowearn-navy font-black text-[9px] uppercase">Master</span>
+                <span className="text-glowearn-navy font-black text-[9px] uppercase">{user.isAdmin ? 'Admin' : 'Master'}</span>
               </div>
             )}
             
@@ -133,16 +149,20 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
                   <h4 className="text-glowearn-gold/80 font-bold text-xs uppercase tracking-widest">Experience (XP)</h4>
-                  <span className="text-[10px] text-white/40 font-bold uppercase">{Math.floor(leveling.currentXp)} / {Math.floor(leveling.xpForNext)} XP</span>
+                  <span className="text-[10px] text-white/40 font-bold uppercase">
+                    {user.isAdmin ? 'MAX' : `${Math.floor(leveling.currentXp)} / ${Math.floor(leveling.xpForNext)} XP`}
+                  </span>
                 </div>
                 <Progress 
-                  value={(leveling.currentXp / leveling.xpForNext) * 100} 
+                  value={leveling.isMaster ? 100 : (leveling.currentXp / leveling.xpForNext) * 100} 
                   className={cn(
                     "h-3 bg-black/40",
                     leveling.isMaster ? "[&>div]:bg-glowearn-gold" : "[&>div]:bg-blue-500"
                   )} 
                 />
-                <p className="text-center text-white/40 text-[9px] font-bold uppercase tracking-widest mt-2">Complete Events to Earn XP</p>
+                <p className="text-center text-white/40 text-[9px] font-bold uppercase tracking-widest mt-2">
+                  {user.isAdmin ? 'All System Access Granted' : 'Complete Events to Earn XP'}
+                </p>
                 
                 <div className="pt-4 grid grid-cols-1 gap-3">
                   {dailyGoals.map((goal, i) => (

@@ -80,7 +80,6 @@ export default function WalletPage() {
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
   
-  // Developer Testing Power: Admin bypasses verification and balance checks if they have testing flags
   const canWithdraw = (user?.isAdmin) || (hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +92,6 @@ export default function WalletPage() {
     setUser(verifiedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
     
-    // Update main users list for persistence
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
     const index = users.findIndex((u: any) => u.id === user.id);
     if (index !== -1) {
@@ -107,7 +105,6 @@ export default function WalletPage() {
     setStep('processing');
     
     setTimeout(() => {
-      // For Admin, we don't necessarily need to deduct points if they are testing "unlimited"
       const newPoints = user.isAdmin ? user.points : user.points - rawInputCoins;
       const updatedUser = { ...user, points: newPoints };
       setUser(updatedUser);
@@ -135,7 +132,12 @@ export default function WalletPage() {
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
       <FloatingElements />
-      <Header usdBalance={user.isAdmin ? user.balance : actualBalance / activeMethod.rate} coinCount={actualBalance} />
+      <Header 
+        usdBalance={user.isAdmin ? user.balance : actualBalance / activeMethod.rate} 
+        coinCount={actualBalance} 
+        xp={user.xp || 0}
+        isAdmin={user.isAdmin}
+      />
       
       <main className="relative z-10 px-6 max-w-md mx-auto space-y-6 flex flex-col items-center">
         {step === 'selection' && (
@@ -150,7 +152,6 @@ export default function WalletPage() {
               </div>
             </section>
 
-            {/* Verification Status Banner - Hidden for Admin testing */}
             {!isVerified && !user.isAdmin && (
               <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3 animate-pulse">
                 <ShieldAlert className="text-red-500 shrink-0" size={24} />
@@ -238,7 +239,6 @@ export default function WalletPage() {
               </CardContent>
             </Card>
 
-            {/* Withdrawal Rules & Privacy Policy Accordion */}
             <section className="w-full">
               <Accordion type="single" collapsible className="w-full space-y-3">
                 <AccordionItem value="policy" className="border-none bg-[#0c2436]/40 rounded-[2rem] px-5 border border-white/5 overflow-hidden">

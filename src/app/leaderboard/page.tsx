@@ -1,15 +1,28 @@
 
 "use client"
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Crown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function LeaderboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const session = localStorage.getItem('glowearn_current_user');
+    if (!session) {
+      router.push('/auth/signup');
+    } else {
+      setUser(JSON.parse(session));
+    }
+  }, [router]);
+
   const topUsers = [
     { rank: 1, name: "SpinPro22", earnings: "1,500,000", avatarSeed: "spin" },
     { rank: 2, name: "GameQueen", earnings: "1,250,000", avatarSeed: "queen" },
@@ -26,7 +39,12 @@ export default function LeaderboardPage() {
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-[#081926]">
       <FloatingElements />
-      <Header />
+      <Header 
+        usdBalance={user?.balance || 0} 
+        coinCount={user?.points || 0} 
+        xp={user?.xp || 0}
+        isAdmin={user?.isAdmin}
+      />
       
       <main className="relative z-10 px-4 max-w-2xl mx-auto space-y-6">
         <header className="mt-8 text-center">
@@ -35,17 +53,14 @@ export default function LeaderboardPage() {
           </h1>
         </header>
 
-        {/* Glowing Leaderboard Card */}
         <section className="neon-gold-border bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md mb-8">
           <div className="p-4 sm:p-6">
-            {/* Table Header */}
             <div className="grid grid-cols-[1fr_2fr_1.5fr] px-4 py-2 border-b border-white/5 mb-2">
               <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider">Rank</span>
               <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider">Username</span>
               <span className="text-glowearn-gold/60 font-bold text-[11px] uppercase tracking-wider text-right">Total Coins</span>
             </div>
 
-            {/* List */}
             <div className="space-y-1">
               {topUsers.map((user) => {
                 const isTop3 = user.rank <= 3;
@@ -60,7 +75,6 @@ export default function LeaderboardPage() {
                       isTop3 && !isRank1 && "bg-white/5"
                     )}
                   >
-                    {/* Rank Column */}
                     <div className="flex flex-col items-start relative">
                       {isTop3 && (
                         <div className="absolute -top-4 left-1 text-glowearn-gold">
@@ -80,7 +94,6 @@ export default function LeaderboardPage() {
                       </span>
                     </div>
 
-                    {/* Username Column */}
                     <div className="flex items-center gap-3">
                       <Avatar className={cn(
                         "h-8 w-8",
@@ -97,7 +110,6 @@ export default function LeaderboardPage() {
                       </span>
                     </div>
 
-                    {/* Coins Column */}
                     <div className="text-right flex flex-col">
                       <span className={cn(
                         "font-black text-sm",

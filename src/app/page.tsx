@@ -66,7 +66,12 @@ export default function Home() {
   return (
     <div className="relative min-h-screen pb-24 pt-20">
       <FloatingElements />
-      <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} />
+      <Header 
+        usdBalance={user.balance} 
+        coinCount={user.points} 
+        xp={user.xp || 0} 
+        isAdmin={user.isAdmin}
+      />
       
       {/* VPN Warning Overlay */}
       {isVpnDetected && !user.isAdmin && (

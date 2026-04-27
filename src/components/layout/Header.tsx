@@ -12,13 +12,25 @@ interface HeaderProps {
   coinCount?: number;
   xp?: number;
   animate?: boolean;
+  isAdmin?: boolean;
 }
 
-export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = false }: HeaderProps) {
+export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = false, isAdmin = false }: HeaderProps) {
   const router = useRouter();
   const [showXpTooltip, setShowXpTooltip] = useState(false);
 
   const levelingData = useMemo(() => {
+    // Developer Master Override
+    if (isAdmin) {
+      return {
+        level: 100,
+        progress: 100,
+        isPro: true,
+        xpInLevel: 999999,
+        xpRequired: 999999
+      };
+    }
+
     let level = 1;
     let currentXp = xp;
     let req = 500;
@@ -46,7 +58,7 @@ export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = fal
       xpInLevel: Math.floor(currentXp),
       xpRequired: req
     };
-  }, [xp]);
+  }, [xp, isAdmin]);
 
   const handleInteractionStart = () => setShowXpTooltip(true);
   const handleInteractionEnd = () => setShowXpTooltip(false);
@@ -88,11 +100,13 @@ export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = fal
                     <div className="absolute top-full left-0 mt-2 z-[60] bg-black/95 border border-glowearn-gold/40 rounded-lg px-3 py-2 backdrop-blur-xl shadow-[0_0_20px_rgba(250,219,59,0.3)] animate-in fade-in zoom-in duration-200 min-w-[120px]">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-glowearn-gold font-black text-[10px] uppercase tracking-widest whitespace-nowrap">
-                          XP: {levelingData.xpInLevel} / {levelingData.xpRequired}
+                          {isAdmin ? 'Master Access' : `XP: ${levelingData.xpInLevel} / ${levelingData.xpRequired}`}
                         </span>
-                        <div className="h-0.5 w-full bg-glowearn-gold/20 rounded-full overflow-hidden">
-                          <div className="h-full bg-glowearn-gold" style={{ width: `${levelingData.progress}%` }}></div>
-                        </div>
+                        {!isAdmin && (
+                          <div className="h-0.5 w-full bg-glowearn-gold/20 rounded-full overflow-hidden">
+                            <div className="h-full bg-glowearn-gold" style={{ width: `${levelingData.progress}%` }}></div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -122,7 +136,7 @@ export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = fal
         {/* Level Progress Bar */}
         <div className="w-full space-y-1">
           <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-white/40">
-            <span>Complete Events to Level Up!</span>
+            <span>{isAdmin ? 'System Master Authenticated' : 'Complete Events to Level Up!'}</span>
             <span>{Math.round(levelingData.progress)}%</span>
           </div>
           <Progress 
