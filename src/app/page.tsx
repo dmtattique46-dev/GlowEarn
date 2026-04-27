@@ -25,6 +25,13 @@ export default function Home() {
     if (userData.xp === undefined) userData.xp = 0;
     setUser(userData);
 
+    // Whitelist Developer from typical ban screens
+    if (userData.isAdmin) {
+      setIsBanned(false);
+      setIsVpnDetected(false);
+      return;
+    }
+
     // Check for Ban
     if (userData.isAccountBanned) {
       setIsBanned(true);
@@ -39,8 +46,8 @@ export default function Home() {
     
     checkVpn();
 
-    // Cheat Protection: Detect impossible scores
-    if (userData.points > 10000000) {
+    // Cheat Protection: Detect impossible scores (Skipped for Admins)
+    if (userData.points > 10000000 && !userData.isAdmin) {
       const bannedUser = { ...userData, isAccountBanned: true };
       localStorage.setItem('glowearn_current_user', JSON.stringify(bannedUser));
       setIsBanned(true);
@@ -54,21 +61,6 @@ export default function Home() {
     }
   }, [router]);
 
-  // Placeholder for future event completion
-  const completeEvent = (xpAmount: number) => {
-    if (!user) return;
-    const updatedUser = { ...user, xp: (user.xp || 0) + xpAmount };
-    setUser(updatedUser);
-    localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
-    
-    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-    const index = users.findIndex((u: any) => u.id === user.id);
-    if (index !== -1) {
-      users[index] = updatedUser;
-      localStorage.setItem('glowearn_users', JSON.stringify(users));
-    }
-  };
-
   if (!user) return null;
 
   return (
@@ -77,7 +69,7 @@ export default function Home() {
       <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} />
       
       {/* VPN Warning Overlay */}
-      {isVpnDetected && (
+      {isVpnDetected && !user.isAdmin && (
         <div className="fixed inset-0 z-[100] bg-red-950/90 backdrop-blur-xl flex items-center justify-center p-6 text-center">
           <div className="space-y-6">
             <Globe className="mx-auto text-red-500 animate-pulse" size={80} />
@@ -114,6 +106,7 @@ export default function Home() {
         <section className="mt-4">
           <h2 className="text-white font-headline text-2xl font-black uppercase tracking-tight">
             Hello, <span className="text-glowearn-gold">{user.name.split(' ')[0]}!</span>
+            {user.isAdmin && <span className="ml-2 text-xs text-red-500 font-black animate-pulse">[ADMIN MODE]</span>}
           </h2>
           <p className="text-white/60 text-sm mt-1">Your earning potential is glowing today.</p>
         </section>

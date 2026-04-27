@@ -1,11 +1,11 @@
 
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { Phone, Mail, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, ShieldCheck, HelpCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Comprehensive Country List with Dialing Codes and Flags
 const COUNTRIES = [
   { name: "Pakistan", code: "+92", flag: "🇵🇰" },
   { name: "United States", code: "+1", flag: "🇺🇸" },
@@ -49,10 +48,12 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isDevMode, setIsDevMode] = useState(false);
+  const [showQuestions, setShowQuestions] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES.find(c => c.name === "Pakistan") || COUNTRIES[0]);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [qAnswers, setQAnswers] = useState({ q1: '', q2: '', q3: '' });
   const [error, setError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
@@ -61,26 +62,13 @@ export default function LoginPage() {
 
     if (isDevMode) {
       if (email === 'developerge@gmail.com' && password === '123456') {
-        const devUser = {
-          id: 'dev-001',
-          name: 'Developer Admin',
-          email: 'developerge@gmail.com',
-          isAdmin: true,
-          isPlayer: false,
-          balance: 99999.99, // Developer Power
-          points: 99999999,  // Developer Power
-          xp: 1000000000,    // Level 100+
-        };
-        localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
-        toast({ title: "Master Access Granted", description: "Logged in with unlimited testing resources." });
-        router.push('/');
+        setShowQuestions(true);
       } else {
         setError('Unauthorized: Only developer can use this feature.');
       }
       return;
     }
 
-    // Regular Phone Login
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
     const fullNumber = selectedCountry.code + mobile;
     const user = users.find((u: any) => u.mobile === fullNumber);
@@ -94,6 +82,35 @@ export default function LoginPage() {
     }
   };
 
+  const handleVerifyQuestions = (e: React.FormEvent) => {
+    e.preventDefault();
+    const isQ1Ok = qAnswers.q1.toLowerCase() === 'no';
+    const isQ2Ok = qAnswers.q2.toUpperCase() === 'ATTIQUE RAZA';
+    const isQ3Ok = qAnswers.q3 === '2026';
+
+    if (isQ1Ok && isQ2Ok && isQ3Ok) {
+      const devUser = {
+        id: 'dev-001',
+        name: 'Developer Admin',
+        email: 'developerge@gmail.com',
+        isAdmin: true,
+        isPlayer: false,
+        balance: 1000.00,
+        points: 99999999,
+        xp: 10000000,
+        isAccountBanned: false
+      };
+      localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
+      toast({ title: "Admin Identity Verified", description: "Unlimited resources enabled for testing." });
+      router.push('/');
+    } else {
+      const bannedUser = { id: 'dev-001', email: 'developerge@gmail.com', isAccountBanned: true };
+      localStorage.setItem('glowearn_current_user', JSON.stringify(bannedUser));
+      toast({ variant: "destructive", title: "Verification Failed", description: "Security Protocol: Account Banned." });
+      router.push('/');
+    }
+  };
+
   return (
     <div className="relative min-h-screen pt-24 pb-12 bg-glowearn-navy">
       <FloatingElements />
@@ -101,93 +118,137 @@ export default function LoginPage() {
       <main className="relative z-10 px-6 max-w-md mx-auto">
         <div className="text-center mb-10">
           <h1 className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter">
-            GlowEarn Login
+            {showQuestions ? 'Identity Verification' : 'GlowEarn Login'}
           </h1>
-          <p className="text-white/60 text-sm mt-2">Resume your earning adventure</p>
+          <p className="text-white/60 text-sm mt-2">
+            {showQuestions ? 'Answer the secret security protocols' : 'Resume your earning adventure'}
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
-              <AlertCircle className="text-red-500 shrink-0" size={18} />
-              <p className="text-red-500 text-xs font-bold uppercase tracking-tight">{error}</p>
-            </div>
-          )}
+        {!showQuestions ? (
+          <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
+                <AlertCircle className="text-red-500 shrink-0" size={18} />
+                <p className="text-red-500 text-xs font-bold uppercase tracking-tight">{error}</p>
+              </div>
+            )}
 
-          {!isDevMode ? (
-            <div className="space-y-4">
-              <label className="text-glowearn-gold/80 text-xs font-bold uppercase tracking-widest px-1">Country & Mobile</label>
-              <div className="flex gap-2">
-                <Select 
-                  onValueChange={(val) => setSelectedCountry(COUNTRIES.find(c => c.name === val) || COUNTRIES[0])}
-                  defaultValue={selectedCountry.name}
-                >
-                  <SelectTrigger className="w-[110px] bg-glowearn-navy/50 border-glowearn-gold/30 rounded-2xl h-[58px] text-white focus:ring-glowearn-gold">
-                    <SelectValue>
-                      <span className="flex items-center gap-2">
-                        <span>{selectedCountry.flag}</span>
-                        <span className="text-sm font-bold">{selectedCountry.code}</span>
-                      </span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-glowearn-navy border-glowearn-gold/30 text-white max-h-[300px]">
-                    {COUNTRIES.map((c) => (
-                      <SelectItem key={c.name} value={c.name} className="hover:bg-glowearn-gold/10 focus:bg-glowearn-gold/10">
+            {!isDevMode ? (
+              <div className="space-y-4">
+                <label className="text-glowearn-gold/80 text-xs font-bold uppercase tracking-widest px-1">Country & Mobile</label>
+                <div className="flex gap-2">
+                  <Select 
+                    onValueChange={(val) => setSelectedCountry(COUNTRIES.find(c => c.name === val) || COUNTRIES[0])}
+                    defaultValue={selectedCountry.name}
+                  >
+                    <SelectTrigger className="w-[110px] bg-glowearn-navy/50 border-glowearn-gold/30 rounded-2xl h-[58px] text-white">
+                      <SelectValue>
                         <span className="flex items-center gap-2">
-                          <span className="text-lg">{c.flag}</span>
-                          <span className="font-medium text-xs">{c.name}</span>
-                          <span className="text-white/40 text-[10px] ml-auto">{c.code}</span>
+                          <span>{selectedCountry.flag}</span>
+                          <span className="text-sm font-bold">{selectedCountry.code}</span>
                         </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex-1">
-                  <GoldenInput 
-                    icon={Phone} 
-                    placeholder="Mobile Number" 
-                    type="tel"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                    required 
-                  />
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-glowearn-navy border-glowearn-gold/30 text-white max-h-[300px]">
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.name} value={c.name} className="hover:bg-glowearn-gold/10">
+                          <span className="flex items-center gap-2">
+                            <span className="text-lg">{c.flag}</span>
+                            <span className="font-medium text-xs">{c.name}</span>
+                            <span className="text-white/40 text-[10px] ml-auto">{c.code}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1">
+                    <GoldenInput 
+                      icon={Phone} 
+                      placeholder="Mobile Number" 
+                      type="tel"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                      required 
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-6 animate-in fade-in zoom-in-95">
-              <GoldenInput 
-                icon={Mail} 
-                label="Admin Email" 
-                placeholder="Enter Admin Email" 
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
-              />
-              <GoldenInput 
-                icon={Lock} 
-                label="Master Key" 
-                placeholder="Enter Master Key" 
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
-            </div>
-          )}
+            ) : (
+              <div className="space-y-6 animate-in fade-in zoom-in-95">
+                <GoldenInput 
+                  icon={Mail} 
+                  label="Admin Email" 
+                  placeholder="Enter Admin Email" 
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required 
+                />
+                <GoldenInput 
+                  icon={Lock} 
+                  label="Master Key" 
+                  placeholder="Enter Master Key" 
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                />
+              </div>
+            )}
 
-          <div className="pt-4">
-            <GoldenButton type="submit">
-              {isDevMode ? 'Authorize Access' : 'Log In Now'}
-            </GoldenButton>
-          </div>
-        </form>
+            <div className="pt-4">
+              <GoldenButton type="submit">
+                {isDevMode ? 'Next Step' : 'Log In Now'}
+              </GoldenButton>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyQuestions} className="space-y-6 animate-in slide-in-from-bottom-8">
+            <div className="bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl mb-6">
+              <p className="text-glowearn-gold text-[10px] font-black uppercase text-center tracking-widest leading-relaxed">
+                Security Protocol Level 2 Active. Any wrong answer will result in permanent device ban.
+              </p>
+            </div>
+            
+            <GoldenInput 
+              icon={HelpCircle}
+              label="Q1: You are developer?"
+              placeholder="Answer here"
+              value={qAnswers.q1}
+              onChange={(e) => setQAnswers({...qAnswers, q1: e.target.value})}
+              required
+            />
+            <GoldenInput 
+              icon={HelpCircle}
+              label="Q2: This app made by?"
+              placeholder="Full Name"
+              value={qAnswers.q2}
+              onChange={(e) => setQAnswers({...qAnswers, q2: e.target.value})}
+              required
+            />
+            <GoldenInput 
+              icon={HelpCircle}
+              label="Q3: This app develop in?"
+              placeholder="Year"
+              value={qAnswers.q3}
+              onChange={(e) => setQAnswers({...qAnswers, q3: e.target.value})}
+              required
+            />
+
+            <div className="pt-4">
+              <GoldenButton type="submit" className="bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.4)]">
+                Final Authorization
+              </GoldenButton>
+            </div>
+          </form>
+        )}
 
         <div className="mt-8 space-y-4 text-center">
           <button 
             onClick={() => {
               setIsDevMode(!isDevMode);
+              setShowQuestions(false);
               setEmail('');
               setPassword('');
               setError('');
@@ -198,15 +259,17 @@ export default function LoginPage() {
             {isDevMode ? 'Switch to Phone Login' : 'Developer Login'}
           </button>
           
-          <p className="text-white/40 text-sm">
-            New to GlowEarn?{" "}
-            <button 
-              onClick={() => router.push('/auth/signup')}
-              className="text-glowearn-gold font-bold hover:underline"
-            >
-              Create Account
-            </button>
-          </p>
+          {!showQuestions && (
+            <p className="text-white/40 text-sm">
+              New to GlowEarn?{" "}
+              <button 
+                onClick={() => router.push('/auth/signup')}
+                className="text-glowearn-gold font-bold hover:underline"
+              >
+                Create Account
+              </button>
+            </p>
+          )}
         </div>
       </main>
     </div>
