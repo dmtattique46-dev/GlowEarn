@@ -1,58 +1,95 @@
 
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { Phone, Mail, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, ShieldCheck, ChevronDown, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Comprehensive Country List with Dialing Codes and Flags
+const COUNTRIES = [
+  { name: "Pakistan", code: "+92", flag: "🇵🇰" },
+  { name: "United States", code: "+1", flag: "🇺🇸" },
+  { name: "United Kingdom", code: "+44", flag: "🇬🇧" },
+  { name: "United Arab Emirates", code: "+971", flag: "🇦🇪" },
+  { name: "Saudi Arabia", code: "+966", flag: "🇸🇦" },
+  { name: "India", code: "+91", flag: "🇮🇳" },
+  { name: "Canada", code: "+1", flag: "🇨🇦" },
+  { name: "Australia", code: "+61", flag: "🇦🇺" },
+  { name: "Germany", code: "+49", flag: "🇩🇪" },
+  { name: "France", code: "+33", flag: "🇫🇷" },
+  { name: "Turkey", code: "+90", flag: "🇹🇷" },
+  { name: "Qatar", code: "+974", flag: "🇶🇦" },
+  { name: "Kuwait", code: "+965", flag: "🇰🇼" },
+  { name: "Oman", code: "+968", flag: "🇴🇲" },
+  { name: "Bahrain", code: "+973", flag: "🇧🇭" },
+  { name: "China", code: "+86", flag: "🇨🇳" },
+  { name: "Japan", code: "+81", flag: "🇯🇵" },
+  { name: "South Korea", code: "+82", flag: "🇰🇷" },
+  { name: "Malaysia", code: "+60", flag: "🇲🇾" },
+  { name: "Singapore", code: "+65", flag: "🇸🇬" },
+  { name: "Indonesia", code: "+62", flag: "🇮🇩" },
+  { name: "Bangladesh", code: "+880", flag: "🇧🇩" },
+  { name: "Nigeria", code: "+234", flag: "🇳🇬" },
+  { name: "South Africa", code: "+27", flag: "🇿🇦" },
+  { name: "Brazil", code: "+55", flag: "🇧🇷" },
+].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES.find(c => c.name === "Pakistan") || COUNTRIES[0]);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showDevLogin, setShowDevLogin] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-
-    if (showDevLogin) {
-      // Developer Master Login Logic
+    if (isDevMode) {
       if (email === 'developerge@gmail.com' && password === '123456') {
         const devUser = {
           id: 'dev-001',
           name: 'Developer Admin',
           email: 'developerge@gmail.com',
-          mobile: '0000000000',
+          isAdmin: true,
+          isPlayer: false,
           balance: 99999.99,
           points: 99999,
-          isAdmin: true,
-          isPlayer: false
         };
         localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
         toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
         router.push('/');
       } else {
-        setError('Unauthorized: Only developer can use email access.');
+        setError('Only developer can use this feature.');
       }
+      return;
+    }
+
+    // Regular Phone Login
+    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+    const fullNumber = selectedCountry.code + mobile;
+    const user = users.find((u: any) => u.mobile === fullNumber);
+
+    if (user) {
+      localStorage.setItem('glowearn_current_user', JSON.stringify({ ...user, isPlayer: true, isAdmin: false }));
+      toast({ title: "Welcome Back!", description: "Successfully logged in via mobile." });
+      router.push('/');
     } else {
-      // Regular User Phone Login Logic
-      const user = users.find((u: any) => u.mobile === mobile);
-      if (user) {
-        localStorage.setItem('glowearn_current_user', JSON.stringify({ ...user, isPlayer: true, isAdmin: false }));
-        toast({ title: "Welcome Back!", description: "Successfully logged in via mobile." });
-        router.push('/');
-      } else {
-        setError('Number not found! Please sign up first.');
-      }
+      setError('Number not found! Please sign up first.');
     }
   };
 
@@ -61,19 +98,11 @@ export default function LoginPage() {
       <FloatingElements />
       
       <main className="relative z-10 px-6 max-w-md mx-auto">
-        <div className="text-center mb-10 relative">
-          <h1 
-            onClick={() => setShowDevLogin(!showDevLogin)}
-            className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter cursor-pointer select-none"
-          >
+        <div className="text-center mb-10">
+          <h1 className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter">
             GlowEarn Login
           </h1>
           <p className="text-white/60 text-sm mt-2">Resume your earning adventure</p>
-          {showDevLogin && (
-            <div className="absolute -top-6 right-0 text-glowearn-gold/40 animate-pulse">
-              <ShieldCheck size={20} />
-            </div>
-          )}
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -84,28 +113,48 @@ export default function LoginPage() {
             </div>
           )}
 
-          {!showDevLogin ? (
+          {!isDevMode ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-white/5 border border-white/10 px-4 py-4 rounded-2xl text-white font-bold text-sm">+92</span>
+              <label className="text-glowearn-gold/80 text-xs font-bold uppercase tracking-widest px-1">Country & Mobile</label>
+              <div className="flex gap-2">
+                <Select 
+                  onValueChange={(val) => setSelectedCountry(COUNTRIES.find(c => c.name === val) || COUNTRIES[0])}
+                  defaultValue={selectedCountry.name}
+                >
+                  <SelectTrigger className="w-[110px] bg-glowearn-navy/50 border-glowearn-gold/30 rounded-2xl h-[58px] text-white focus:ring-glowearn-gold">
+                    <SelectValue>
+                      <span className="flex items-center gap-2">
+                        <span>{selectedCountry.flag}</span>
+                        <span className="text-sm font-bold">{selectedCountry.code}</span>
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-glowearn-navy border-glowearn-gold/30 text-white max-h-[300px]">
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c.name} value={c.name} className="hover:bg-glowearn-gold/10 focus:bg-glowearn-gold/10">
+                        <span className="flex items-center gap-2">
+                          <span className="text-lg">{c.flag}</span>
+                          <span className="font-medium text-xs">{c.name}</span>
+                          <span className="text-white/40 text-[10px] ml-auto">{c.code}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex-1">
                   <GoldenInput 
                     icon={Phone} 
-                    label="Mobile Number" 
-                    placeholder="3XX XXXXXXX" 
+                    placeholder="Mobile Number" 
                     type="tel"
                     value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
                     required 
                   />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
-              <div className="bg-glowearn-gold/5 p-3 rounded-xl border border-glowearn-gold/20 mb-4">
-                <p className="text-glowearn-gold text-[10px] font-black uppercase text-center">Master Developer Portal</p>
-              </div>
+            <div className="space-y-6 animate-in fade-in zoom-in-95">
               <GoldenInput 
                 icon={Mail} 
                 label="Admin Email" 
@@ -129,20 +178,30 @@ export default function LoginPage() {
 
           <div className="pt-4">
             <GoldenButton type="submit">
-              {showDevLogin ? 'Authorize Access' : 'Log In Now'}
+              {isDevMode ? 'Authorize Access' : 'Log In Now'}
             </GoldenButton>
           </div>
         </form>
 
-        <p className="text-center text-white/40 text-sm mt-8">
-          New to GlowEarn?{" "}
+        <div className="mt-8 space-y-4 text-center">
           <button 
-            onClick={() => router.push('/auth/signup')}
-            className="text-glowearn-gold font-bold hover:underline"
+            onClick={() => setIsDevMode(!isDevMode)}
+            className="flex items-center gap-2 mx-auto text-glowearn-gold/40 hover:text-glowearn-gold text-[10px] font-black uppercase tracking-widest transition-colors"
           >
-            Create Account
+            <ShieldCheck size={14} />
+            {isDevMode ? 'Switch to Phone Login' : 'Developer Login'}
           </button>
-        </p>
+          
+          <p className="text-white/40 text-sm">
+            New to GlowEarn?{" "}
+            <button 
+              onClick={() => router.push('/auth/signup')}
+              className="text-glowearn-gold font-bold hover:underline"
+            >
+              Create Account
+            </button>
+          </p>
+        </div>
       </main>
     </div>
   );
