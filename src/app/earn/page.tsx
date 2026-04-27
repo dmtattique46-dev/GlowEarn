@@ -5,9 +5,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, Trophy, RotateCcw, Zap } from 'lucide-react';
+import { Sparkles, Trophy, RotateCcw, Zap, Gamepad2, ChevronLeft, Lock, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { Card, CardContent } from "@/components/ui/card";
+import Image from 'next/image';
 
 // Game Constants
 const ROWS = 8;
@@ -15,6 +17,7 @@ const COLS = 8;
 const OFFSET_Y = 80;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
+type GameState = 'menu' | 'puzzle';
 
 const SHAPES = [
   { id: 'square', cells: [[1, 1], [1, 1]], color: 1 },
@@ -26,12 +29,12 @@ const SHAPES = [
 
 export default function EarnPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<GameState>('menu');
   const [user, setUser] = useState<any>(null);
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
-  const [showLevelUp, setShowLevelUp] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
 
@@ -50,48 +53,16 @@ export default function EarnPage() {
       router.push('/auth/signup');
     } else {
       const userData = JSON.parse(session);
-      // Ensure XP field exists
-      if (userData.xp === undefined) userData.xp = 0;
       setUser(userData);
       resetGame();
     }
   }, [router]);
 
-  const calculateLevel = (totalXp: number) => {
-    let level = 1;
-    let xp = totalXp;
-    let req = 500;
-
-    // Levels 1-15: 500 XP each
-    while (level < 15 && xp >= 500) {
-      xp -= 500;
-      level++;
-    }
-
-    // Level 15+: 20% increase each time
-    if (level >= 15) {
-      req = 500;
-      while (xp >= req) {
-        xp -= req;
-        level++;
-        req = Math.floor(req * 1.2);
-      }
-    }
-    return level;
-  };
-
-  const updateUserPersistence = (newBalance: number, newCoins: number) => {
+  const updateUserPersistence = (newCoins: number) => {
     if (!user) return;
-    
-    // Level is now based on user.xp (which doesn't change during gameplay)
-    const currentXp = user.xp || 0;
-    const newLevel = calculateLevel(currentXp);
-    
     const updatedUser = { 
       ...user, 
-      balance: newBalance, 
-      points: newCoins, // points = coins
-      level: newLevel 
+      points: newCoins 
     };
     setUser(updatedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
@@ -235,12 +206,9 @@ export default function EarnPage() {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
         colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        // Earning Logic: Only Coins (Points) during gameplay. NO XP.
         const coinReward = totalLines * 100;
-        
         setScore(prev => prev + coinReward);
-        // Note: user.points represents Coins in this version
-        updateUserPersistence(user.balance, (user.points || 0) + coinReward);
+        updateUserPersistence((user.points || 0) + coinReward);
         
         setShowLineClear(true);
         setShowCoinsAnim(true);
@@ -254,15 +222,13 @@ export default function EarnPage() {
       if (newShelf.every(s => s === null)) refillShelf();
       else setShelf(newShelf);
 
-      // Check Game Over
-      const currentAvailableShelf = newShelf.every(s => s === null) ? SHAPES : newShelf;
-      if (checkGameOver(newGrid, currentAvailableShelf)) {
+      if (checkGameOver(newGrid, newShelf.every(s => s === null) ? SHAPES : newShelf)) {
         setIsGameOver(true);
       }
     }
 
     setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-  }, [dragState, shelf, grid, user, checkGameOver, updateUserPersistence]);
+  }, [dragState, shelf, grid, user, checkGameOver]);
 
   useEffect(() => {
     if (dragState.index !== null) {
@@ -286,101 +252,175 @@ export default function EarnPage() {
       <FloatingElements />
       <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} animate={showCoinsAnim} />
       
-      <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
-        <div className="text-center space-y-1">
-          <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
-            GLOW PUZZLE
-          </h1>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Session Coins:</span>
-            <span className="text-white font-black text-xl italic">{score.toLocaleString()}</span>
-          </div>
-        </div>
+      <main className="relative z-10 px-6 max-w-md mx-auto space-y-8 flex flex-col items-center">
+        
+        {activeTab === 'menu' ? (
+          <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <header className="text-center space-y-2">
+              <h1 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase">
+                Choose Your <span className="text-white">Challenge</span>
+              </h1>
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Select a game to start earning</p>
+            </header>
 
-        <div 
-          ref={boardRef}
-          className="w-full max-w-[400px] aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative"
-        >
-          <div className="grid grid-cols-8 gap-1 h-full w-full">
-            {grid.map((row, r) => (
-              row.map((cell, c) => {
-                const shape = dragState.index !== null ? shelf[dragState.index] : null;
-                const isGhost = dragState.ghost && shape && 
-                                r >= dragState.ghost.r && r < dragState.ghost.r + shape.cells.length &&
-                                c >= dragState.ghost.c && c < dragState.ghost.c + shape.cells[0].length &&
-                                shape.cells[r - dragState.ghost.r][c - dragState.ghost.c] !== 0;
-
-                return (
-                  <div 
-                    key={`${r}-${c}`}
-                    className={cn(
-                      "aspect-square w-full rounded-sm border transition-all duration-200",
-                      cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                      cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                      cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                      cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                      cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                      cell === 0 && !isGhost && "bg-white/5 border-white/5",
-                      isGhost && "bg-yellow-500/20 border-yellow-500/50 scale-[0.95]"
-                    )}
+            <div className="grid gap-6">
+              {/* Puzzle Game Card */}
+              <Card 
+                className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                onClick={() => setActiveTab('puzzle')}
+              >
+                <div className="relative h-48 w-full">
+                  <Image 
+                    src="https://picsum.photos/seed/puzzle-game/600/400" 
+                    alt="Glow Block Puzzle"
+                    fill
+                    className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                    data-ai-hint="glow blocks"
                   />
-                );
-              })
-            ))}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
+                  <div className="absolute bottom-4 left-6">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Gamepad2 className="text-glowearn-gold" size={18} />
+                      <span className="text-glowearn-gold font-black uppercase text-xs tracking-widest">Active Challenge</span>
+                    </div>
+                    <h2 className="text-white font-headline font-black text-2xl uppercase italic">Glow Block Puzzle</h2>
+                  </div>
+                </div>
+                <CardContent className="p-6">
+                  <p className="text-white/60 text-xs font-medium leading-relaxed mb-6">
+                    Match blocks to clear lines and collect golden coins. The more lines you clear, the higher the rewards!
+                  </p>
+                  <button className="w-full shimmer-btn py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
+                    <Play className="text-glowearn-navy fill-glowearn-navy" size={20} />
+                    <span className="text-glowearn-navy font-black uppercase tracking-widest">Play Now</span>
+                  </button>
+                </CardContent>
+              </Card>
+
+              {/* Coming Soon Card */}
+              <Card className="bg-black/40 border border-white/5 rounded-[2.5rem] overflow-hidden grayscale opacity-50 relative group">
+                <div className="absolute inset-0 flex items-center justify-center z-20">
+                  <div className="flex flex-col items-center gap-2">
+                    <Lock className="text-white/40 group-hover:text-glowearn-gold transition-colors" size={40} />
+                    <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.4em]">Coming Soon</span>
+                  </div>
+                </div>
+                <div className="h-32 w-full bg-white/5 flex items-center justify-center p-8">
+                  <Zap className="text-white/10" size={60} />
+                </div>
+                <CardContent className="p-6 text-center">
+                  <h3 className="text-white/40 font-black uppercase tracking-widest text-sm italic">New Challenge Awaits</h3>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-
-          {showLineClear && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[1.5rem] z-20 animate-in zoom-in duration-300">
-              <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
-              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">LINE CLEAR!</h2>
-            </div>
-          )}
-
-          {isGameOver && (
-            <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
-              <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
-              <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
-              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Coins Earned: {score}</p>
+        ) : (
+          <div className="w-full flex flex-col items-center space-y-6 animate-in zoom-in duration-300">
+            <div className="w-full flex items-center justify-between">
               <button 
-                onClick={resetGame}
-                className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
+                onClick={() => setActiveTab('menu')}
+                className="flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest bg-white/5 px-4 py-2 rounded-full border border-white/10 transition-all"
               >
-                <RotateCcw size={20} /> Play Again
+                <ChevronLeft size={16} /> Back to Menu
               </button>
+              <div className="flex items-center gap-2 bg-glowearn-gold/10 px-4 py-2 rounded-full border border-glowearn-gold/20">
+                <span className="text-glowearn-gold font-black italic text-sm">{score.toLocaleString()}</span>
+                <span className="text-glowearn-gold/60 font-bold uppercase text-[9px] tracking-widest">Session</span>
+              </div>
             </div>
-          )}
-        </div>
 
-        <section className={cn("w-full space-y-4 pt-2", isGameOver && "opacity-20 pointer-events-none")}>
-          <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 shadow-inner">
-            {shelf.map((shape, idx) => (
-              <div 
-                key={idx}
-                onMouseDown={(e) => handleDragStart(e, idx)}
-                onTouchStart={(e) => handleDragStart(e, idx)}
-                className={cn(
-                  "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-all cursor-grab active:cursor-grabbing",
-                  dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/20 hover:bg-white/5",
-                  !shape && "opacity-0 pointer-events-none"
-                )}
-              >
-                {shape && (
-                  <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
-                    {shape.cells.flat().map((c: number, i: number) => (
+            <div className="text-center">
+              <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
+                GLOW PUZZLE
+              </h1>
+            </div>
+
+            <div 
+              ref={boardRef}
+              className="w-full aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative"
+            >
+              <div className="grid grid-cols-8 gap-1 h-full w-full">
+                {grid.map((row, r) => (
+                  row.map((cell, c) => {
+                    const shape = dragState.index !== null ? shelf[dragState.index] : null;
+                    const isGhost = dragState.ghost && shape && 
+                                    r >= dragState.ghost.r && r < dragState.ghost.r + shape.cells.length &&
+                                    c >= dragState.ghost.c && c < dragState.ghost.c + shape.cells[0].length &&
+                                    shape.cells[r - dragState.ghost.r][c - dragState.ghost.c] !== 0;
+
+                    return (
                       <div 
-                        key={i} 
-                        className={cn("w-5 h-5 aspect-square rounded-[2px] border-[1px]", 
-                          c !== 0 ? "bg-glowearn-gold border-white/40 shadow-sm" : "bg-transparent border-transparent"
+                        key={`${r}-${c}`}
+                        className={cn(
+                          "aspect-square w-full rounded-sm border transition-all duration-200",
+                          cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 0 && !isGhost && "bg-white/5 border-white/5",
+                          isGhost && "bg-yellow-500/20 border-yellow-500/50 scale-[0.95]"
                         )}
                       />
-                    ))}
-                  </div>
-                )}
+                    );
+                  })
+                ))}
               </div>
-            ))}
+
+              {showLineClear && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[1.5rem] z-20 animate-in zoom-in duration-300">
+                  <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
+                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">LINE CLEAR!</h2>
+                </div>
+              )}
+
+              {isGameOver && (
+                <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
+                  <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
+                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
+                  <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Coins Earned: {score}</p>
+                  <button 
+                    onClick={resetGame}
+                    className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
+                  >
+                    <RotateCcw size={20} /> Play Again
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <section className={cn("w-full space-y-4 pt-2", isGameOver && "opacity-20 pointer-events-none")}>
+              <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 shadow-inner">
+                {shelf.map((shape, idx) => (
+                  <div 
+                    key={idx}
+                    onMouseDown={(e) => handleDragStart(e, idx)}
+                    onTouchStart={(e) => handleDragStart(e, idx)}
+                    className={cn(
+                      "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-all cursor-grab active:cursor-grabbing",
+                      dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/20 hover:bg-white/5",
+                      !shape && "opacity-0 pointer-events-none"
+                    )}
+                  >
+                    {shape && (
+                      <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${shape.cells[0].length}, minmax(0, 1fr))` }}>
+                        {shape.cells.flat().map((c: number, i: number) => (
+                          <div 
+                            key={i} 
+                            className={cn("w-5 h-5 aspect-square rounded-[2px] border-[1px]", 
+                              c !== 0 ? "bg-glowearn-gold border-white/40 shadow-sm" : "bg-transparent border-transparent"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to earn gold coins</p>
+            </section>
           </div>
-          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to earn gold coins</p>
-        </section>
+        )}
       </main>
 
       {/* Drag Overlay */}
