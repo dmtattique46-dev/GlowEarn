@@ -70,10 +70,11 @@ export default function SignUpPage() {
           isAdmin: true,
           isPlayer: false,
           balance: 99999.99,
-          points: 99999,
+          points: 99999999,
+          xp: 1000000000,
         };
         localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
-        toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
+        toast({ title: "Master Access Granted", description: "Logged in as System Developer with unlimited resources." });
         router.push('/');
       } else {
         setError('Unauthorized: Only developer can use this feature.');

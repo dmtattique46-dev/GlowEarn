@@ -67,11 +67,12 @@ export default function LoginPage() {
           email: 'developerge@gmail.com',
           isAdmin: true,
           isPlayer: false,
-          balance: 99999.99,
-          points: 99999,
+          balance: 99999.99, // Developer Power
+          points: 99999999,  // Developer Power
+          xp: 1000000000,    // Level 100+
         };
         localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
-        toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
+        toast({ title: "Master Access Granted", description: "Logged in with unlimited testing resources." });
         router.push('/');
       } else {
         setError('Unauthorized: Only developer can use this feature.');

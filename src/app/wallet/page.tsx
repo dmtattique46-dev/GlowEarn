@@ -79,7 +79,9 @@ export default function WalletPage() {
   const isVerified = user?.emailVerified && user?.phoneVerified;
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
-  const canWithdraw = hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified;
+  
+  // Developer Testing Power: Admin bypasses verification and balance checks if they have testing flags
+  const canWithdraw = (user?.isAdmin) || (hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -105,7 +107,9 @@ export default function WalletPage() {
     setStep('processing');
     
     setTimeout(() => {
-      const updatedUser = { ...user, points: user.points - rawInputCoins };
+      // For Admin, we don't necessarily need to deduct points if they are testing "unlimited"
+      const newPoints = user.isAdmin ? user.points : user.points - rawInputCoins;
+      const updatedUser = { ...user, points: newPoints };
       setUser(updatedUser);
       localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
       
@@ -131,7 +135,7 @@ export default function WalletPage() {
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
       <FloatingElements />
-      <Header usdBalance={actualBalance / activeMethod.rate} coinCount={actualBalance} />
+      <Header usdBalance={user.isAdmin ? user.balance : actualBalance / activeMethod.rate} coinCount={actualBalance} />
       
       <main className="relative z-10 px-6 max-w-md mx-auto space-y-6 flex flex-col items-center">
         {step === 'selection' && (
@@ -146,8 +150,8 @@ export default function WalletPage() {
               </div>
             </section>
 
-            {/* Verification Status Banner */}
-            {!isVerified && (
+            {/* Verification Status Banner - Hidden for Admin testing */}
+            {!isVerified && !user.isAdmin && (
               <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3 animate-pulse">
                 <ShieldAlert className="text-red-500 shrink-0" size={24} />
                 <div className="flex-1">
@@ -160,6 +164,16 @@ export default function WalletPage() {
                 >
                   Verify Now
                 </button>
+              </div>
+            )}
+
+            {user.isAdmin && (
+              <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3">
+                <ShieldCheck className="text-glowearn-gold shrink-0" size={24} />
+                <div className="flex-1">
+                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Testing Mode Active</p>
+                  <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase leading-tight">Bypassing all verification and balance limits.</p>
+                </div>
               </div>
             )}
 
@@ -187,7 +201,7 @@ export default function WalletPage() {
                     </div>
                   </div>
 
-                  {rawInputCoins > 0 && !hasMinimumRequired && (
+                  {rawInputCoins > 0 && !hasMinimumRequired && !user.isAdmin && (
                     <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1">
                       <AlertCircle size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -295,7 +309,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                {isVerified ? 'Confirm Withdrawal' : 'Verification Required'}
+                {canWithdraw && user.isAdmin ? 'Test Confirm' : (isVerified ? 'Confirm Withdrawal' : 'Verification Required')}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />
@@ -415,4 +429,3 @@ export default function WalletPage() {
     </div>
   );
 }
-
