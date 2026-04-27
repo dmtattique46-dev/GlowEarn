@@ -49,14 +49,17 @@ export default function EarnPage() {
     if (!session) {
       router.push('/auth/signup');
     } else {
-      setUser(JSON.parse(session));
+      const userData = JSON.parse(session);
+      // Ensure XP field exists
+      if (userData.xp === undefined) userData.xp = 0;
+      setUser(userData);
       resetGame();
     }
   }, [router]);
 
-  const calculateLevel = (totalPoints: number) => {
+  const calculateLevel = (totalXp: number) => {
     let level = 1;
-    let xp = totalPoints;
+    let xp = totalXp;
     let req = 500;
 
     // Levels 1-15: 500 XP each
@@ -77,19 +80,19 @@ export default function EarnPage() {
     return level;
   };
 
-  const updateUserPersistence = (newBalance: number, newPoints: number) => {
+  const updateUserPersistence = (newBalance: number, newCoins: number) => {
     if (!user) return;
     
-    const newLevel = calculateLevel(newPoints);
-    const oldLevel = user.level || 1;
-
-    if (newLevel > oldLevel) {
-      setShowLevelUp(true);
-      triggerHaptic([200, 100, 200]);
-      setTimeout(() => setShowLevelUp(false), 3000);
-    }
-
-    const updatedUser = { ...user, balance: newBalance, points: newPoints, level: newLevel };
+    // Level is now based on user.xp (which doesn't change during gameplay)
+    const currentXp = user.xp || 0;
+    const newLevel = calculateLevel(currentXp);
+    
+    const updatedUser = { 
+      ...user, 
+      balance: newBalance, 
+      points: newCoins, // points = coins
+      level: newLevel 
+    };
     setUser(updatedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
     
@@ -232,11 +235,12 @@ export default function EarnPage() {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
         colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        // Earning Logic: Only Coins (Points) during gameplay
+        // Earning Logic: Only Coins (Points) during gameplay. NO XP.
         const coinReward = totalLines * 100;
         
         setScore(prev => prev + coinReward);
-        updateUserPersistence(user.balance, user.points + coinReward);
+        // Note: user.points represents Coins in this version
+        updateUserPersistence(user.balance, (user.points || 0) + coinReward);
         
         setShowLineClear(true);
         setShowCoinsAnim(true);
@@ -280,7 +284,7 @@ export default function EarnPage() {
   return (
     <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden select-none touch-none">
       <FloatingElements />
-      <Header usdBalance={user.balance} coinCount={user.points} animate={showCoinsAnim} />
+      <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} animate={showCoinsAnim} />
       
       <main className="relative z-10 px-4 max-w-md mx-auto space-y-6 flex flex-col items-center">
         <div className="text-center space-y-1">
@@ -288,7 +292,7 @@ export default function EarnPage() {
             GLOW PUZZLE
           </h1>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Score:</span>
+            <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Session Coins:</span>
             <span className="text-white font-black text-xl italic">{score.toLocaleString()}</span>
           </div>
         </div>
@@ -332,19 +336,11 @@ export default function EarnPage() {
             </div>
           )}
 
-          {showLevelUp && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-[1.5rem] z-[150] animate-in zoom-in duration-500">
-              <Zap className="text-glowearn-gold animate-pulse mb-2 fill-glowearn-gold" size={64} />
-              <h2 className="text-white font-headline text-5xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_20px_#fadb3b]">LEVEL UP!</h2>
-              <p className="text-glowearn-gold font-bold uppercase tracking-[0.3em] mt-2">New Mastery Unlocked</p>
-            </div>
-          )}
-
           {isGameOver && (
             <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
               <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
               <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
-              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Score: {score}</p>
+              <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Coins Earned: {score}</p>
               <button 
                 onClick={resetGame}
                 className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
@@ -383,7 +379,7 @@ export default function EarnPage() {
               </div>
             ))}
           </div>
-          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to place shapes</p>
+          <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to earn gold coins</p>
         </section>
       </main>
 

@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, DollarSign, ShieldAlert, Ban, Globe, AlertTriangle } from 'lucide-react';
+import { TrendingUp, DollarSign, ShieldAlert, Ban, Globe, AlertTriangle, Calendar, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
@@ -22,6 +22,7 @@ export default function Home() {
       return;
     }
     const userData = JSON.parse(session);
+    if (userData.xp === undefined) userData.xp = 0;
     setUser(userData);
 
     // Check for Ban
@@ -30,11 +31,7 @@ export default function Home() {
     }
 
     // Mock VPN Detection Logic
-    // In a real app, this would use an IP-based API or check for unusual timezone/language mismatches.
     const checkVpn = () => {
-      // Simulate detection if timezone offset is unusual or just for demo purposes
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      // Mock logic: trigger if user has a specific flag or randomly for demo (here we just provide the structure)
       if (userData.mockVpnActive) {
         setIsVpnDetected(true);
       }
@@ -42,7 +39,7 @@ export default function Home() {
     
     checkVpn();
 
-    // Cheat Protection: Detect impossible scores (e.g., > 10M points for a basic account)
+    // Cheat Protection: Detect impossible scores
     if (userData.points > 10000000) {
       const bannedUser = { ...userData, isAccountBanned: true };
       localStorage.setItem('glowearn_current_user', JSON.stringify(bannedUser));
@@ -57,12 +54,27 @@ export default function Home() {
     }
   }, [router]);
 
+  // Placeholder for future event completion
+  const completeEvent = (xpAmount: number) => {
+    if (!user) return;
+    const updatedUser = { ...user, xp: (user.xp || 0) + xpAmount };
+    setUser(updatedUser);
+    localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
+    
+    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
+    const index = users.findIndex((u: any) => u.id === user.id);
+    if (index !== -1) {
+      users[index] = updatedUser;
+      localStorage.setItem('glowearn_users', JSON.stringify(users));
+    }
+  };
+
   if (!user) return null;
 
   return (
     <div className="relative min-h-screen pb-24 pt-20">
       <FloatingElements />
-      <Header usdBalance={user.balance} coinCount={user.points} />
+      <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} />
       
       {/* VPN Warning Overlay */}
       {isVpnDetected && (
@@ -98,7 +110,7 @@ export default function Home() {
         </div>
       )}
 
-      <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-6">
+      <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-8">
         <section className="mt-4">
           <h2 className="text-white font-headline text-2xl font-black uppercase tracking-tight">
             Hello, <span className="text-glowearn-gold">{user.name.split(' ')[0]}!</span>
@@ -121,11 +133,42 @@ export default function Home() {
               <div className="bg-glowearn-gold/20 p-2 rounded-full mb-2">
                 <TrendingUp className="text-glowearn-gold" size={20} />
               </div>
-              <span className="text-white/40 text-[10px] uppercase font-bold">Points</span>
+              <span className="text-white/40 text-[10px] uppercase font-bold">Total Coins</span>
               <span className="text-glowearn-gold font-headline font-black text-xl">{user.points.toLocaleString()}</span>
             </CardContent>
           </Card>
         </div>
+
+        {/* Live Events Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Calendar className="text-glowearn-gold" size={18} />
+            <h3 className="text-white font-bold uppercase tracking-widest text-xs">Live Events</h3>
+          </div>
+          
+          <Card className="bg-gradient-to-br from-glowearn-gold/10 to-transparent border-2 border-glowearn-gold/30 relative overflow-hidden rounded-3xl backdrop-blur-xl">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-glowearn-gold/20 p-2 rounded-xl">
+                  <Star className="text-glowearn-gold" size={20} />
+                </div>
+                <div>
+                  <h4 className="text-white font-black uppercase text-sm tracking-tight">Play Store Launch Event!</h4>
+                  <p className="text-glowearn-gold/80 text-[10px] font-bold uppercase italic">Coming Soon</p>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-black/40 rounded-2xl border border-glowearn-gold/10">
+                <p className="text-white/80 text-xs font-bold leading-relaxed">
+                  Complete this exclusive event to earn <span className="text-glowearn-gold">500 XP</span> and instantly reach <span className="text-glowearn-gold">Level 2</span>.
+                </p>
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <span className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em]">Requirement: Register Interest</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
 
         {/* Security Protocol Card */}
         <section className="space-y-4">

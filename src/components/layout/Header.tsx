@@ -10,29 +10,30 @@ import { cn } from '@/lib/utils';
 interface HeaderProps {
   usdBalance?: number;
   coinCount?: number;
+  xp?: number;
   animate?: boolean;
 }
 
-export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: HeaderProps) {
+export function Header({ usdBalance = 0.00, coinCount = 0, xp = 0, animate = false }: HeaderProps) {
   const router = useRouter();
   const [showXpTooltip, setShowXpTooltip] = useState(false);
 
   const levelingData = useMemo(() => {
     let level = 1;
-    let xp = coinCount;
+    let currentXp = xp;
     let req = 500;
     
     // Levels 1-15: 500 XP step
-    while (level < 15 && xp >= 500) {
-      xp -= 500;
+    while (level < 15 && currentXp >= 500) {
+      currentXp -= 500;
       level++;
     }
     
     // Level 15+: Exponential growth
     if (level >= 15) {
       req = 500;
-      while (xp >= req) {
-        xp -= req;
+      while (currentXp >= req) {
+        currentXp -= req;
         level++;
         req = Math.floor(req * 1.2);
       }
@@ -40,12 +41,12 @@ export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: He
     
     return {
       level,
-      progress: (xp / req) * 100,
+      progress: (currentXp / req) * 100,
       isPro: level >= 15,
-      xpInLevel: Math.floor(xp),
+      xpInLevel: Math.floor(currentXp),
       xpRequired: req
     };
-  }, [coinCount]);
+  }, [xp]);
 
   const handleInteractionStart = () => setShowXpTooltip(true);
   const handleInteractionEnd = () => setShowXpTooltip(false);
@@ -121,7 +122,7 @@ export function Header({ usdBalance = 0.00, coinCount = 0, animate = false }: He
         {/* Level Progress Bar */}
         <div className="w-full space-y-1">
           <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-white/40">
-            <span>Progress to Lvl {levelingData.level + 1}</span>
+            <span>Complete Events to Level Up!</span>
             <span>{Math.round(levelingData.progress)}%</span>
           </div>
           <Progress 
