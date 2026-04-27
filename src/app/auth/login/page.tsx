@@ -48,7 +48,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isDevMode, setIsDevMode] = useState(false);
-  const [showQuestions, setShowQuestions] = useState(false);
+  const [showSecurityCheck, setShowSecurityCheck] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES.find(c => c.name === "Pakistan") || COUNTRIES[0]);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -60,20 +60,27 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
+    // Developer Master Portal Interception
     if (isDevMode) {
       if (email === 'developerge@gmail.com' && password === '123456') {
-        setShowQuestions(true);
+        // Stop redirection here - trigger security questions instead
+        setShowSecurityCheck(true);
       } else {
         setError('Unauthorized: Only developer can use this feature.');
       }
       return;
     }
 
+    // Standard User Login via Mobile
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
     const fullNumber = selectedCountry.code + mobile;
     const user = users.find((u: any) => u.mobile === fullNumber);
 
     if (user) {
+      if (user.isAccountBanned) {
+        setError('Your account is banned for security violations.');
+        return;
+      }
       localStorage.setItem('glowearn_current_user', JSON.stringify({ ...user, isPlayer: true, isAdmin: false }));
       toast({ title: "Welcome Back!", description: "Successfully logged in via mobile." });
       router.push('/');
@@ -84,13 +91,15 @@ export default function LoginPage() {
 
   const handleVerifyQuestions = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Strict Secret Answers Validation
     const isQ1Ok = qAnswers.q1.toLowerCase() === 'no';
     const isQ2Ok = qAnswers.q2.toUpperCase() === 'ATTIQUE RAZA';
     const isQ3Ok = qAnswers.q3 === '2026';
 
     if (isQ1Ok && isQ2Ok && isQ3Ok) {
       const devUser = {
-        id: 'dev-001',
+        id: 'dev-master-admin',
         name: 'Developer Admin',
         email: 'developerge@gmail.com',
         isAdmin: true,
@@ -98,16 +107,24 @@ export default function LoginPage() {
         balance: 1000.00,
         points: 99999999,
         xp: 10000000,
-        isAccountBanned: false
+        isAccountBanned: false,
+        emailVerified: true,
+        phoneVerified: true
       };
       localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
-      toast({ title: "Admin Identity Verified", description: "Unlimited resources enabled for testing." });
+      toast({ title: "Admin Identity Verified", description: "Unlimited resources and Master access enabled." });
       router.push('/');
     } else {
-      const bannedUser = { id: 'dev-001', email: 'developerge@gmail.com', isAccountBanned: true };
+      // Penalty: Permanent Account Ban
+      const bannedUser = { 
+        id: 'dev-failed-auth', 
+        email: 'developerge@gmail.com', 
+        isAccountBanned: true,
+        name: 'Failed Admin Attempt'
+      };
       localStorage.setItem('glowearn_current_user', JSON.stringify(bannedUser));
-      toast({ variant: "destructive", title: "Verification Failed", description: "Security Protocol: Account Banned." });
-      router.push('/');
+      toast({ variant: "destructive", title: "Security Breach Detected", description: "Identity verification failed. Device has been flagged." });
+      router.push('/'); // Redirect to Home to show Ban Overlay
     }
   };
 
@@ -118,14 +135,14 @@ export default function LoginPage() {
       <main className="relative z-10 px-6 max-w-md mx-auto">
         <div className="text-center mb-10">
           <h1 className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter">
-            {showQuestions ? 'Identity Verification' : 'GlowEarn Login'}
+            {showSecurityCheck ? 'Identity Verification' : 'GlowEarn Login'}
           </h1>
           <p className="text-white/60 text-sm mt-2">
-            {showQuestions ? 'Answer the secret security protocols' : 'Resume your earning adventure'}
+            {showSecurityCheck ? 'Verify Security Protocol' : 'Resume your earning adventure'}
           </p>
         </div>
 
-        {!showQuestions ? (
+        {!showSecurityCheck ? (
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
@@ -205,8 +222,8 @@ export default function LoginPage() {
           </form>
         ) : (
           <form onSubmit={handleVerifyQuestions} className="space-y-6 animate-in slide-in-from-bottom-8">
-            <div className="bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl mb-6">
-              <p className="text-glowearn-gold text-[10px] font-black uppercase text-center tracking-widest leading-relaxed">
+            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-3xl mb-6">
+              <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest leading-relaxed">
                 Security Protocol Level 2 Active. Any wrong answer will result in permanent device ban.
               </p>
             </div>
@@ -214,7 +231,7 @@ export default function LoginPage() {
             <GoldenInput 
               icon={HelpCircle}
               label="Q1: You are developer?"
-              placeholder="Answer here"
+              placeholder="Enter Answer"
               value={qAnswers.q1}
               onChange={(e) => setQAnswers({...qAnswers, q1: e.target.value})}
               required
@@ -248,7 +265,7 @@ export default function LoginPage() {
           <button 
             onClick={() => {
               setIsDevMode(!isDevMode);
-              setShowQuestions(false);
+              setShowSecurityCheck(false);
               setEmail('');
               setPassword('');
               setError('');
@@ -259,7 +276,7 @@ export default function LoginPage() {
             {isDevMode ? 'Switch to Phone Login' : 'Developer Login'}
           </button>
           
-          {!showQuestions && (
+          {!showSecurityCheck && (
             <p className="text-white/40 text-sm">
               New to GlowEarn?{" "}
               <button 
