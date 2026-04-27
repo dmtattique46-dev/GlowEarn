@@ -2,50 +2,78 @@
 "use client"
 
 import React, { useState } from 'react';
-import { Header } from '@/components/layout/Header';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showDevLogin, setShowDevLogin] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-    const user = users.find((u: any) => u.email === email && u.password === password);
 
-    if (user) {
-      localStorage.setItem('glowearn_current_user', JSON.stringify(user));
-      toast({
-        title: "Welcome Back!",
-        description: "You've successfully logged into GlowEarn.",
-      });
-      router.push('/');
+    if (showDevLogin) {
+      // Developer Master Login Logic
+      if (email === 'developerge@gmail.com' && password === '123456') {
+        const devUser = {
+          id: 'dev-001',
+          name: 'Developer Admin',
+          email: 'developerge@gmail.com',
+          mobile: '0000000000',
+          balance: 99999.99,
+          points: 99999,
+          isAdmin: true,
+          isPlayer: false
+        };
+        localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
+        toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
+        router.push('/');
+      } else {
+        setError('Unauthorized: Only developer can use email access.');
+      }
     } else {
-      setError('Invalid email or password!');
+      // Regular User Phone Login Logic
+      const user = users.find((u: any) => u.mobile === mobile);
+      if (user) {
+        localStorage.setItem('glowearn_current_user', JSON.stringify({ ...user, isPlayer: true, isAdmin: false }));
+        toast({ title: "Welcome Back!", description: "Successfully logged in via mobile." });
+        router.push('/');
+      } else {
+        setError('Number not found! Please sign up first.');
+      }
     }
   };
 
   return (
-    <div className="relative min-h-screen pt-24 pb-12">
+    <div className="relative min-h-screen pt-24 pb-12 bg-glowearn-navy">
       <FloatingElements />
       
       <main className="relative z-10 px-6 max-w-md mx-auto">
-        <div className="text-center mb-10">
-          <h1 className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter">
+        <div className="text-center mb-10 relative">
+          <h1 
+            onClick={() => setShowDevLogin(!showDevLogin)}
+            className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter cursor-pointer select-none"
+          >
             GlowEarn Login
           </h1>
           <p className="text-white/60 text-sm mt-2">Resume your earning adventure</p>
+          {showDevLogin && (
+            <div className="absolute -top-6 right-0 text-glowearn-gold/40 animate-pulse">
+              <ShieldCheck size={20} />
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -56,34 +84,52 @@ export default function LoginPage() {
             </div>
           )}
 
-          <GoldenInput 
-            icon={Mail} 
-            label="Email Address" 
-            placeholder="john@example.com" 
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required 
-          />
-          <GoldenInput 
-            icon={Lock} 
-            label="Password" 
-            placeholder="••••••••" 
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required 
-          />
-
-          <div className="flex justify-end">
-            <button type="button" className="text-white/40 text-xs font-bold uppercase hover:text-glowearn-gold">
-              Forgot Password?
-            </button>
-          </div>
+          {!showDevLogin ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-white/5 border border-white/10 px-4 py-4 rounded-2xl text-white font-bold text-sm">+92</span>
+                <div className="flex-1">
+                  <GoldenInput 
+                    icon={Phone} 
+                    label="Mobile Number" 
+                    placeholder="3XX XXXXXXX" 
+                    type="tel"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    required 
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
+              <div className="bg-glowearn-gold/5 p-3 rounded-xl border border-glowearn-gold/20 mb-4">
+                <p className="text-glowearn-gold text-[10px] font-black uppercase text-center">Master Developer Portal</p>
+              </div>
+              <GoldenInput 
+                icon={Mail} 
+                label="Admin Email" 
+                placeholder="developerge@gmail.com" 
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required 
+              />
+              <GoldenInput 
+                icon={Lock} 
+                label="Master Key" 
+                placeholder="••••••••" 
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required 
+              />
+            </div>
+          )}
 
           <div className="pt-4">
             <GoldenButton type="submit">
-              Log In Now
+              {showDevLogin ? 'Authorize Access' : 'Log In Now'}
             </GoldenButton>
           </div>
         </form>
