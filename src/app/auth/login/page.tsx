@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { Phone, Mail, Lock, AlertCircle, ShieldCheck, ChevronDown, Search } from 'lucide-react';
+import { Phone, Mail, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -74,7 +74,7 @@ export default function LoginPage() {
         toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
         router.push('/');
       } else {
-        setError('Only developer can use this feature.');
+        setError('Unauthorized: Only developer can use this feature.');
       }
       return;
     }
@@ -158,7 +158,7 @@ export default function LoginPage() {
               <GoldenInput 
                 icon={Mail} 
                 label="Admin Email" 
-                placeholder="developerge@gmail.com" 
+                placeholder="Enter Admin Email" 
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -167,7 +167,7 @@ export default function LoginPage() {
               <GoldenInput 
                 icon={Lock} 
                 label="Master Key" 
-                placeholder="••••••••" 
+                placeholder="Enter Master Key" 
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -185,7 +185,12 @@ export default function LoginPage() {
 
         <div className="mt-8 space-y-4 text-center">
           <button 
-            onClick={() => setIsDevMode(!isDevMode)}
+            onClick={() => {
+              setIsDevMode(!isDevMode);
+              setEmail('');
+              setPassword('');
+              setError('');
+            }}
             className="flex items-center gap-2 mx-auto text-glowearn-gold/40 hover:text-glowearn-gold text-[10px] font-black uppercase tracking-widest transition-colors"
           >
             <ShieldCheck size={14} />

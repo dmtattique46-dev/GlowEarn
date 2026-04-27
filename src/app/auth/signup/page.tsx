@@ -76,7 +76,7 @@ export default function SignUpPage() {
         toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
         router.push('/');
       } else {
-        setError('Only developer can use this feature.');
+        setError('Unauthorized: Only developer can use this feature.');
       }
       return;
     }
@@ -190,7 +190,7 @@ export default function SignUpPage() {
               <GoldenInput 
                 icon={Mail} 
                 label="Admin Email" 
-                placeholder="developerge@gmail.com" 
+                placeholder="Enter Admin Email" 
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -199,7 +199,7 @@ export default function SignUpPage() {
               <GoldenInput 
                 icon={Lock} 
                 label="Master Key" 
-                placeholder="••••••••" 
+                placeholder="Enter Master Key" 
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -217,7 +217,11 @@ export default function SignUpPage() {
 
         <div className="mt-8 space-y-4 text-center">
           <button 
-            onClick={() => setIsDevMode(!isDevMode)}
+            onClick={() => {
+              setIsDevMode(!isDevMode);
+              setFormData({...formData, email: '', password: ''});
+              setError('');
+            }}
             className="flex items-center gap-2 mx-auto text-glowearn-gold/40 hover:text-glowearn-gold text-[10px] font-black uppercase tracking-widest transition-colors"
           >
             <ShieldCheck size={14} />
