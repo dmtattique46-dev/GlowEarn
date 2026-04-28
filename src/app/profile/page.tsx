@@ -8,11 +8,11 @@ import { FloatingElements } from '@/components/background/FloatingElements';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, LogOut, ChevronRight, Trophy, Loader2 } from 'lucide-react';
+import { Sparkles, LogOut, ChevronRight, Trophy, Loader2, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { doc, increment } from 'firebase/firestore';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -44,6 +44,15 @@ export default function ProfilePage() {
   const handleLogout = () => {
     localStorage.removeItem('glowearn_current_user');
     router.push('/auth/signup');
+  };
+
+  const handleAddTestCoins = () => {
+    if (!userRef || !isAdmin) return;
+    updateDocumentNonBlocking(userRef, {
+      coins: increment(10000),
+      usd: increment(5.00), // $0.50 per 1000 * 10 = $5
+      xp: increment(1000)
+    });
   };
 
   const leveling = useMemo(() => {
@@ -137,6 +146,16 @@ export default function ProfilePage() {
             </p>
           </div>
         </header>
+
+        {isAdmin && (
+          <button 
+            onClick={handleAddTestCoins}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-glowearn-gold/20 border-2 border-glowearn-gold rounded-2xl animate-pulse"
+          >
+            <Zap className="text-glowearn-gold fill-glowearn-gold" size={20} />
+            <span className="text-glowearn-gold font-black uppercase tracking-widest text-sm">Add Test Coins (+10,000)</span>
+          </button>
+        )}
 
         <section>
           <Card className={cn(

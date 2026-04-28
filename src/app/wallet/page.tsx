@@ -60,6 +60,7 @@ export default function WalletPage() {
   const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
 
   const AD_THRESHOLD = 1500;
+  const CONVERSION_RATE = 0.50; // $0.50 per 1000 coins
 
   useEffect(() => {
     const session = localStorage.getItem('glowearn_current_user');
@@ -100,13 +101,13 @@ export default function WalletPage() {
   , [selectedMethod]);
 
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
-  const usdValue = ((rawInputCoins / 1000) * 0.10).toFixed(2);
+  const usdValue = ((rawInputCoins / 1000) * CONVERSION_RATE).toFixed(2);
   
   const isAdsMet = adsWatched >= AD_THRESHOLD;
   const hasEnoughCoins = rawInputCoins <= actualBalance;
   const hasMinCoins = rawInputCoins >= 1000;
   
-  const canWithdraw = (isAdmin) || (isAdsMet && isVerified && hasEnoughCoins && hasMinCoins);
+  const canWithdraw = (isAdmin) || (isAdsMet && hasEnoughCoins && hasMinCoins);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -136,7 +137,6 @@ export default function WalletPage() {
     playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('processing');
     
-    // 1. Create the Withdrawal Request in Firestore
     const withdrawRequestsRef = collection(firestore, 'WithdrawRequests');
     const requestData = {
       userId: sessionUser.id,
@@ -152,11 +152,10 @@ export default function WalletPage() {
 
     addDocumentNonBlocking(withdrawRequestsRef, requestData);
 
-    // 2. Deduct coins from user balance
     if (!isAdmin) {
       updateDocumentNonBlocking(userRef, { 
         coins: increment(-rawInputCoins),
-        usd: increment(Number(usdValue) * 0.95) 
+        usd: increment(-(Number(usdValue))) // Deduct from the user's computed USD balance
       });
     }
 
@@ -187,7 +186,7 @@ export default function WalletPage() {
               <div className="space-y-0.5">
                 <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
                 <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-                  USD VALUE: <span className="italic">${((actualBalance / 1000) * 0.10).toFixed(2)}</span>
+                  USD VALUE: <span className="italic">${((actualBalance / 1000) * CONVERSION_RATE).toFixed(2)}</span>
                 </h1>
               </div>
             </section>
@@ -234,7 +233,7 @@ export default function WalletPage() {
                     className="h-2.5 bg-black/40 [&>div]:bg-gradient-to-r [&>div]:from-glowearn-gold [&>div]:to-yellow-600" 
                   />
                   <p className="text-[9px] text-white/40 font-bold uppercase italic text-center leading-relaxed">
-                    {isAdsMet ? "✓ Verified Activity - Conversion Unlocked" : "Unlock conversion by watching 1500 ads to verify your activity."}
+                    {isAdsMet ? "✓ Verified Activity - Conversion Unlocked" : `Unlock conversion by watching ${AD_THRESHOLD} ads to verify your activity.`}
                   </p>
                   
                   <button 
@@ -330,7 +329,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                {canWithdraw && isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : (isVerified ? 'CONFIRM WITHDRAWAL' : 'VERIFICATION REQUIRED'))}
+                {canWithdraw && isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : 'CONFIRM WITHDRAWAL')}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />

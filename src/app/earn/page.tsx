@@ -68,9 +68,13 @@ export default function EarnPage() {
 
   const syncCoinsToFirestore = (coinReward: number) => {
     if (!userRef) return;
+    // Calculation: $0.50 per 1000 coins
+    const usdReward = (coinReward / 1000) * 0.50;
+    
     updateDocumentNonBlocking(userRef, {
       coins: increment(coinReward),
-      xp: increment(Math.floor(coinReward / 10)) // Earn XP proportionally
+      usd: increment(usdReward),
+      xp: increment(Math.floor(coinReward / 10))
     });
   };
 
