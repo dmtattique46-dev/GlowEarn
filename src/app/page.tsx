@@ -6,14 +6,16 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, DollarSign, ShieldAlert, Ban, Globe, AlertTriangle, Calendar, Star } from 'lucide-react';
+import { TrendingUp, DollarSign, ShieldAlert, Ban, Globe, AlertTriangle, Calendar, Star, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 export default function Home() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const firestore = useFirestore();
+  const [sessionUser, setSessionUser] = useState<any>(null);
   const [isVpnDetected, setIsVpnDetected] = useState(false);
-  const [isBanned, setIsBanned] = useState(false);
 
   useEffect(() => {
     const session = localStorage.getItem('glowearn_current_user');
@@ -21,60 +23,37 @@ export default function Home() {
       router.push('/auth/signup');
       return;
     }
-    const userData = JSON.parse(session);
-    if (userData.xp === undefined) userData.xp = 0;
-    setUser(userData);
-
-    // Whitelist Developer from typical ban screens
-    if (userData.isAdmin) {
-      setIsBanned(false);
-      setIsVpnDetected(false);
-      return;
-    }
-
-    // Check for Ban
-    if (userData.isAccountBanned) {
-      setIsBanned(true);
-    }
-
-    // Mock VPN Detection Logic
-    const checkVpn = () => {
-      if (userData.mockVpnActive) {
-        setIsVpnDetected(true);
-      }
-    };
-    
-    checkVpn();
-
-    // Cheat Protection: Detect impossible scores (Skipped for Admins)
-    if (userData.points > 10000000 && !userData.isAdmin) {
-      const bannedUser = { ...userData, isAccountBanned: true };
-      localStorage.setItem('glowearn_current_user', JSON.stringify(bannedUser));
-      setIsBanned(true);
-      // Update global user list
-      const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-      const index = users.findIndex((u: any) => u.id === userData.id);
-      if (index !== -1) {
-        users[index] = bannedUser;
-        localStorage.setItem('glowearn_users', JSON.stringify(users));
-      }
-    }
+    setSessionUser(JSON.parse(session));
   }, [router]);
 
-  if (!user) return null;
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !sessionUser?.id) return null;
+    return doc(firestore, 'users', sessionUser.id);
+  }, [firestore, sessionUser?.id]);
+
+  const { data: userData, isLoading } = useDoc(userRef);
+
+  const isAdmin = userData?.isAdmin ?? sessionUser?.isAdmin ?? false;
+  const isBanned = userData?.isAccountBanned ?? sessionUser?.isAccountBanned ?? false;
+  const coins = userData?.coins ?? sessionUser?.points ?? 0;
+  const usd = userData?.usd ?? sessionUser?.balance ?? 0.00;
+  const name = userData?.name ?? sessionUser?.name ?? 'GlowEarner';
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-glowearn-navy flex items-center justify-center">
+        <Loader2 className="text-glowearn-gold animate-spin" size={48} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen pb-24 pt-20">
       <FloatingElements />
-      <Header 
-        usdBalance={user.balance} 
-        coinCount={user.points} 
-        xp={user.xp || 0} 
-        isAdmin={user.isAdmin}
-      />
+      <Header />
       
       {/* VPN Warning Overlay */}
-      {isVpnDetected && !user.isAdmin && (
+      {isVpnDetected && !isAdmin && (
         <div className="fixed inset-0 z-[100] bg-red-950/90 backdrop-blur-xl flex items-center justify-center p-6 text-center">
           <div className="space-y-6">
             <Globe className="mx-auto text-red-500 animate-pulse" size={80} />
@@ -110,8 +89,8 @@ export default function Home() {
       <main className="relative z-10 px-6 max-w-2xl mx-auto space-y-8">
         <section className="mt-4">
           <h2 className="text-white font-headline text-2xl font-black uppercase tracking-tight">
-            Hello, <span className="text-glowearn-gold">{user.name.split(' ')[0]}!</span>
-            {user.isAdmin && <span className="ml-2 text-xs text-red-500 font-black animate-pulse">[ADMIN MODE]</span>}
+            Hello, <span className="text-glowearn-gold">{name.split(' ')[0]}!</span>
+            {isAdmin && <span className="ml-2 text-xs text-red-500 font-black animate-pulse">[ADMIN MODE]</span>}
           </h2>
           <p className="text-white/60 text-sm mt-1">Your earning potential is glowing today.</p>
         </section>
@@ -123,7 +102,7 @@ export default function Home() {
                 <DollarSign className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Earnings</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">${user.balance.toFixed(2)}</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">${Number(usd).toFixed(2)}</span>
             </CardContent>
           </Card>
           <Card className="bg-white/5 border-glowearn-gold/20 backdrop-blur-md rounded-2xl overflow-hidden">
@@ -132,7 +111,7 @@ export default function Home() {
                 <TrendingUp className="text-glowearn-gold" size={20} />
               </div>
               <span className="text-white/40 text-[10px] uppercase font-bold">Total Coins</span>
-              <span className="text-glowearn-gold font-headline font-black text-xl">{user.points.toLocaleString()}</span>
+              <span className="text-glowearn-gold font-headline font-black text-xl">{Math.floor(coins).toLocaleString()}</span>
             </CardContent>
           </Card>
         </div>

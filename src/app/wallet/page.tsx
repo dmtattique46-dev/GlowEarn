@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle, Music } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
@@ -17,6 +17,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { doc, increment } from 'firebase/firestore';
 
 const BinanceLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_15px_rgba(243,186,47,0.3)]">
@@ -50,27 +52,33 @@ const BitcoinLogo = () => (
 type Step = 'selection' | 'details' | 'processing' | 'success';
 
 export default function WalletPage() {
-  const [user, setUser] = useState<any>(null);
+  const firestore = useFirestore();
+  const [sessionUser, setSessionUser] = useState<any>(null);
   const [coinsInput, setCoinsInput] = useState<string>("0");
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
   const [step, setStep] = useState<Step>('selection');
   const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
-  const [adsWatched, setAdsWatched] = useState<number>(0);
 
   const AD_THRESHOLD = 1500;
-  // Conversion Rate: 1000 Coins = $0.10 USD
-  const COIN_CONVERSION_RATE = 10000; // Total coins for $1.00 USD (since 1000 = $0.10)
 
   useEffect(() => {
     const session = localStorage.getItem('glowearn_current_user');
     if (session) {
-      const userData = JSON.parse(session);
-      setUser(userData);
-      
-      const savedAds = localStorage.getItem(`ads_watched_${userData.id}`) || '0';
-      setAdsWatched(parseInt(savedAds, 10));
+      setSessionUser(JSON.parse(session));
     }
   }, []);
+
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !sessionUser?.id) return null;
+    return doc(firestore, 'users', sessionUser.id);
+  }, [firestore, sessionUser?.id]);
+
+  const { data: userData } = useDoc(userRef);
+
+  const actualBalance = userData?.coins ?? 0;
+  const adsWatched = userData?.adsWatched ?? 0;
+  const isAdmin = userData?.isAdmin ?? false;
+  const isVerified = userData?.emailVerified && userData?.phoneVerified;
 
   const playSfx = (url: string) => {
     try {
@@ -92,16 +100,13 @@ export default function WalletPage() {
   , [selectedMethod]);
 
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
-  // Math: (coins / 1000) * 0.10
   const usdValue = ((rawInputCoins / 1000) * 0.10).toFixed(2);
   
-  const actualBalance = user?.points || 0;
-  const isVerified = user?.emailVerified && user?.phoneVerified;
   const isAdsMet = adsWatched >= AD_THRESHOLD;
   const hasEnoughCoins = rawInputCoins <= actualBalance;
   const hasMinCoins = rawInputCoins >= 1000;
   
-  const canWithdraw = (user?.isAdmin) || (isAdsMet && isVerified && hasEnoughCoins && hasMinCoins);
+  const canWithdraw = (isAdmin) || (isAdsMet && isVerified && hasEnoughCoins && hasMinCoins);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -109,26 +114,15 @@ export default function WalletPage() {
   };
 
   const handleVerify = () => {
+    if (!userRef) return;
     playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-    const verifiedUser = { ...user, emailVerified: true, phoneVerified: true };
-    setUser(verifiedUser);
-    localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
-    
-    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-    const index = users.findIndex((u: any) => u.id === user.id);
-    if (index !== -1) {
-      users[index] = verifiedUser;
-      localStorage.setItem('glowearn_users', JSON.stringify(users));
-    }
+    updateDocumentNonBlocking(userRef, { emailVerified: true, phoneVerified: true });
   };
 
   const handleSimulateAd = () => {
+    if (!userRef) return;
     playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-    const newVal = adsWatched + 50;
-    setAdsWatched(newVal);
-    if (user) {
-      localStorage.setItem(`ads_watched_${user.id}`, newVal.toString());
-    }
+    updateDocumentNonBlocking(userRef, { adsWatched: increment(50) });
   };
 
   const handleProceedToDetails = () => {
@@ -137,21 +131,17 @@ export default function WalletPage() {
   };
 
   const handleSubmitRequest = () => {
-    if (!withdrawalDetail) return;
+    if (!withdrawalDetail || !userRef) return;
     playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('processing');
     
     setTimeout(() => {
-      const newPoints = user.isAdmin ? user.points : user.points - rawInputCoins;
-      const updatedUser = { ...user, points: newPoints };
-      setUser(updatedUser);
-      localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
-      
-      const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-      const index = users.findIndex((u: any) => u.id === user.id);
-      if (index !== -1) {
-        users[index] = updatedUser;
-        localStorage.setItem('glowearn_users', JSON.stringify(users));
+      // Deduct coins in Firestore
+      if (!isAdmin) {
+        updateDocumentNonBlocking(userRef, { 
+          coins: increment(-rawInputCoins),
+          usd: increment(Number(usdValue) * 0.95) // Add net payout to internal USD balance (optional tracking)
+        });
       }
       
       playSfx('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
@@ -165,17 +155,12 @@ export default function WalletPage() {
     setCoinsInput('0');
   };
 
-  if (!user) return null;
+  if (!sessionUser) return null;
 
   return (
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
       <FloatingElements />
-      <Header 
-        usdBalance={user.isAdmin ? user.balance : actualBalance / 10000} 
-        coinCount={actualBalance} 
-        xp={user.xp || 0}
-        isAdmin={user.isAdmin}
-      />
+      <Header />
       
       <main className="relative z-10 px-6 max-w-md mx-auto space-y-6 flex flex-col items-center">
         {step === 'selection' && (
@@ -190,7 +175,7 @@ export default function WalletPage() {
               </div>
             </section>
 
-            {user.isAdmin && (
+            {isAdmin && (
               <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3 animate-in slide-in-from-top-4">
                 <ShieldCheck className="text-glowearn-gold shrink-0" size={24} />
                 <div className="flex-1">
@@ -200,7 +185,7 @@ export default function WalletPage() {
               </div>
             )}
 
-            {!isVerified && !user.isAdmin && (
+            {!isVerified && !isAdmin && (
               <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3">
                 <ShieldAlert className="text-red-500 shrink-0" size={24} />
                 <div className="flex-1">
@@ -216,8 +201,7 @@ export default function WalletPage() {
               </div>
             )}
 
-            {/* Ad Progress Bar Logic */}
-            {!user.isAdmin && (
+            {!isAdmin && (
               <Card className="w-full bg-[#0c2436]/40 border border-glowearn-gold/20 rounded-3xl overflow-hidden p-5 shadow-2xl">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
@@ -270,7 +254,7 @@ export default function WalletPage() {
                     </div>
                   </div>
 
-                  {rawInputCoins > 0 && !hasEnoughCoins && !user.isAdmin && (
+                  {rawInputCoins > 0 && !hasEnoughCoins && !isAdmin && (
                     <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1 justify-center">
                       <AlertCircle size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -278,7 +262,7 @@ export default function WalletPage() {
                       </span>
                     </div>
                   )}
-                  {rawInputCoins > 0 && !hasMinCoins && !user.isAdmin && (
+                  {rawInputCoins > 0 && !hasMinCoins && !isAdmin && (
                     <div className="flex items-center gap-2 px-2 text-red-400 animate-in fade-in slide-in-from-top-1 justify-center">
                       <Info size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
@@ -315,42 +299,6 @@ export default function WalletPage() {
               </CardContent>
             </Card>
 
-            <section className="w-full">
-              <Accordion type="single" collapsible className="w-full space-y-3">
-                <AccordionItem value="policy" className="border-none bg-[#0c2436]/40 rounded-[2rem] px-5 border border-white/5 overflow-hidden">
-                  <AccordionTrigger className="hover:no-underline py-5 text-glowearn-gold font-black uppercase text-[11px] tracking-widest">
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck size={18} className="text-glowearn-gold" />
-                      Withdrawal Rules & Privacy
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-6">
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
-                        <Clock className="text-glowearn-gold shrink-0 mt-1" size={16} />
-                        <div>
-                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Processing Time</p>
-                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
-                            Withdrawal processing takes <span className="text-white">24 to 72 hours</span>. Please be patient while we review.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
-                        <ShieldAlert className="text-red-500 shrink-0 mt-1" size={16} />
-                        <div>
-                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Manual Tracking Policy</p>
-                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
-                            Hum har transaction ko <span className="text-red-500">manually review</span> karte hain. suspicious activity payi gayi toh payment reject hogi.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </section>
-
             <button 
               disabled={!canWithdraw}
               onClick={handleProceedToDetails}
@@ -365,7 +313,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                {canWithdraw && user.isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : (isVerified ? 'CONFIRM WITHDRAWAL' : 'VERIFICATION REQUIRED'))}
+                {canWithdraw && isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : (isVerified ? 'CONFIRM WITHDRAWAL' : 'VERIFICATION REQUIRED'))}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />
@@ -379,10 +327,7 @@ export default function WalletPage() {
         {step === 'details' && (
           <div className="w-full space-y-8 mt-4 animate-in slide-in-from-right duration-300">
             <button 
-              onClick={() => {
-                playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-                setStep('selection');
-              }}
+              onClick={() => setStep('selection')}
               className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
             >
               <ChevronLeft size={16} /> Back to Vault
@@ -421,11 +366,6 @@ export default function WalletPage() {
                     <span className="text-white font-black text-xl italic">${(Number(usdValue) * 0.95).toFixed(2)}</span>
                   </div>
                 </div>
-
-                <div className="flex items-start gap-2 text-[9px] text-white/40 font-bold uppercase leading-tight italic">
-                  <Info size={10} className="shrink-0 mt-0.5" />
-                  <p>By confirming, you agree to our manual review protocol and 24-72h processing window.</p>
-                </div>
               </CardContent>
             </Card>
 
@@ -452,22 +392,14 @@ export default function WalletPage() {
 
         {step === 'processing' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in duration-500">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full border-4 border-glowearn-gold/20 animate-ping"></div>
-              <Loader2 className="text-glowearn-gold animate-spin relative z-10" size={100} strokeWidth={1} />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
-              <p className="text-glowearn-gold/60 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Manual Review Protocol Active</p>
-            </div>
+            <Loader2 className="text-glowearn-gold animate-spin" size={100} strokeWidth={1} />
+            <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
           </div>
         )}
 
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in duration-500 px-4">
-            <div className="bg-glowearn-gold/10 p-8 rounded-full border-2 border-glowearn-gold/30 shadow-[0_0_50px_rgba(250,219,59,0.2)]">
-              <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1} />
-            </div>
+            <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1} />
             <div className="space-y-2">
               <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Queued!</span></h2>
               <p className="text-white/70 font-bold text-sm leading-relaxed max-w-[280px] mx-auto">
@@ -475,11 +407,8 @@ export default function WalletPage() {
               </p>
             </div>
             <button 
-              onClick={() => {
-                playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-                handleReset();
-              }} 
-              className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-[10px] hover:underline hover:scale-110 transition-transform"
+              onClick={handleReset} 
+              className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-[10px] hover:underline"
             >
               Return to Wallet
             </button>

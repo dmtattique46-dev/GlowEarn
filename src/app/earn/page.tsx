@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import Image from 'next/image';
+import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { doc, increment } from 'firebase/firestore';
 
 // Game Constants
 const ROWS = 8;
@@ -29,8 +31,9 @@ const SHAPES = [
 
 export default function EarnPage() {
   const router = useRouter();
+  const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState<GameState>('menu');
-  const [user, setUser] = useState<any>(null);
+  const [sessionUser, setSessionUser] = useState<any>(null);
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
@@ -38,7 +41,6 @@ export default function EarnPage() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
 
-  // Drag State
   const [dragState, setDragState] = useState<{
     index: number | null;
     pos: { x: number; y: number };
@@ -52,27 +54,24 @@ export default function EarnPage() {
     if (!session) {
       router.push('/auth/signup');
     } else {
-      const userData = JSON.parse(session);
-      setUser(userData);
+      setSessionUser(JSON.parse(session));
       resetGame();
     }
   }, [router]);
 
-  const updateUserPersistence = (newCoins: number) => {
-    if (!user) return;
-    const updatedUser = { 
-      ...user, 
-      points: newCoins 
-    };
-    setUser(updatedUser);
-    localStorage.setItem('glowearn_current_user', JSON.stringify(updatedUser));
-    
-    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === user.id);
-    if (userIndex > -1) {
-      users[userIndex] = updatedUser;
-      localStorage.setItem('glowearn_users', JSON.stringify(users));
-    }
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !sessionUser?.id) return null;
+    return doc(firestore, 'users', sessionUser.id);
+  }, [firestore, sessionUser?.id]);
+
+  const { data: userData } = useDoc(userRef);
+
+  const syncCoinsToFirestore = (coinReward: number) => {
+    if (!userRef) return;
+    updateDocumentNonBlocking(userRef, {
+      coins: increment(coinReward),
+      xp: increment(Math.floor(coinReward / 10)) // Earn XP proportionally
+    });
   };
 
   const resetGame = () => {
@@ -191,7 +190,6 @@ export default function EarnPage() {
         });
       });
 
-      // Clear Lines Logic
       const rowsToClear: number[] = [];
       const colsToClear: number[] = [];
       for (let ir = 0; ir < ROWS; ir++) if (newGrid[ir].every(cell => cell !== 0)) rowsToClear.push(ir);
@@ -208,7 +206,7 @@ export default function EarnPage() {
         
         const coinReward = totalLines * 100;
         setScore(prev => prev + coinReward);
-        updateUserPersistence((user.points || 0) + coinReward);
+        syncCoinsToFirestore(coinReward);
         
         setShowLineClear(true);
         setShowCoinsAnim(true);
@@ -228,7 +226,7 @@ export default function EarnPage() {
     }
 
     setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-  }, [dragState, shelf, grid, user, checkGameOver]);
+  }, [dragState, shelf, grid, syncCoinsToFirestore, checkGameOver]);
 
   useEffect(() => {
     if (dragState.index !== null) {
@@ -245,12 +243,12 @@ export default function EarnPage() {
     };
   }, [dragState.index, handleDragMove, handleDragEnd]);
 
-  if (!user) return null;
+  if (!sessionUser) return null;
 
   return (
     <div className="relative min-h-screen bg-glowearn-navy pb-24 pt-24 overflow-hidden select-none touch-none">
       <FloatingElements />
-      <Header usdBalance={user.balance} coinCount={user.points} xp={user.xp || 0} animate={showCoinsAnim} />
+      <Header animate={showCoinsAnim} />
       
       <main className="relative z-10 px-6 max-w-md mx-auto space-y-8 flex flex-col items-center">
         
@@ -264,7 +262,6 @@ export default function EarnPage() {
             </header>
 
             <div className="grid gap-6">
-              {/* Puzzle Game Card */}
               <Card 
                 className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
                 onClick={() => setActiveTab('puzzle')}
@@ -297,7 +294,6 @@ export default function EarnPage() {
                 </CardContent>
               </Card>
 
-              {/* Coming Soon Card */}
               <Card className="bg-black/40 border border-white/5 rounded-[2.5rem] overflow-hidden grayscale opacity-50 relative group">
                 <div className="absolute inset-0 flex items-center justify-center z-20">
                   <div className="flex flex-col items-center gap-2">
