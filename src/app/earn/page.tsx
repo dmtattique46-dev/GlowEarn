@@ -1,17 +1,17 @@
 
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, Trophy, RotateCcw, Zap, Gamepad2, ChevronLeft, Lock, Play } from 'lucide-react';
+import { Sparkles, Trophy, RotateCcw, Zap, Gamepad2, ChevronLeft, Lock, Play, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import Image from 'next/image';
 import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc, increment } from 'firebase/firestore';
+import { doc, increment, serverTimestamp } from 'firebase/firestore';
 
 // Game Constants
 const ROWS = 8;
@@ -19,7 +19,7 @@ const COLS = 8;
 const OFFSET_Y = 80;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
-type GameState = 'menu' | 'puzzle';
+type GameState = 'menu' | 'puzzle' | 'quick-solve';
 
 const SHAPES = [
   { id: 'square', cells: [[1, 1], [1, 1]], color: 1 },
@@ -40,12 +40,12 @@ export default function EarnPage() {
   const [showLineClear, setShowLineClear] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
-
-  const [dragState, setDragState] = useState<{
-    index: number | null;
-    pos: { x: number; y: number };
-    ghost: { r: number; c: number } | null;
-  }>({ index: null, pos: { x: 0, y: 0 }, ghost: null });
+  
+  // Quick Solve State
+  const [targetCode, setTargetCode] = useState<string>('');
+  const [userCode, setUserCode] = useState<string>('');
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -66,18 +66,71 @@ export default function EarnPage() {
 
   const { data: userData } = useDoc(userRef);
 
-  const syncCoinsToFirestore = (coinReward: number) => {
+  const isAdmin = userData?.isAdmin || sessionUser?.isAdmin;
+
+  // Sync Coins Logic (Rate: $0.50 per 1000 coins)
+  const syncCoinsToFirestore = useCallback((coinReward: number) => {
     if (!userRef) return;
-    // Calculation: $0.50 per 1000 coins
     const usdReward = (coinReward / 1000) * 0.50;
     
     updateDocumentNonBlocking(userRef, {
       coins: increment(coinReward),
       usd: increment(usdReward),
-      xp: increment(Math.floor(coinReward / 10))
+      xp: increment(Math.floor(coinReward / 10)),
+      updatedAt: serverTimestamp()
     });
+  }, [userRef]);
+
+  // Cooldown Logic for Quick Solve
+  useEffect(() => {
+    if (activeTab === 'quick-solve' && userData?.lastQuickPuzzleAt) {
+      const lastSolve = new Date(userData.lastQuickPuzzleAt).getTime();
+      const now = Date.now();
+      const diff = Math.floor((now - lastSolve) / 1000);
+      const remaining = Math.max(0, 60 - diff);
+      setCooldownRemaining(remaining);
+
+      if (remaining > 0) {
+        const timer = setInterval(() => {
+          setCooldownRemaining(prev => Math.max(0, prev - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+      }
+    }
+  }, [activeTab, userData?.lastQuickPuzzleAt]);
+
+  const generateNewQuickPuzzle = () => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setTargetCode(code);
+    setUserCode('');
+    setSuccessMessage(null);
   };
 
+  const handleSolveQuickPuzzle = () => {
+    if (userCode === targetCode || isAdmin) {
+      if (cooldownRemaining > 0 && !isAdmin) return;
+
+      syncCoinsToFirestore(20);
+      if (userRef) {
+        updateDocumentNonBlocking(userRef, {
+          lastQuickPuzzleAt: new Date().toISOString()
+        });
+      }
+      
+      setSuccessMessage('Congratulations! +20 Coins added');
+      setShowCoinsAnim(true);
+      setTimeout(() => {
+        setSuccessMessage(null);
+        setShowCoinsAnim(false);
+        generateNewQuickPuzzle();
+      }, 2000);
+      triggerHaptic([50, 30, 50]);
+    } else {
+      triggerHaptic(100);
+    }
+  };
+
+  // Block Puzzle Logic
   const resetGame = () => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
     setScore(0);
@@ -127,6 +180,12 @@ export default function EarnPage() {
     return !hasAnyMove;
   }, [canPlaceShape]);
 
+  const [dragState, setDragState] = useState<{
+    index: number | null;
+    pos: { x: number; y: number };
+    ghost: { r: number; c: number } | null;
+  }>({ index: null, pos: { x: 0, y: 0 }, ghost: null });
+
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     if (!shelf[index] || isGameOver) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -152,11 +211,8 @@ export default function EarnPage() {
       const cellSize = (rect.width - 16) / COLS;
       const shape = shelf[dragState.index];
       
-      const visualX = clientX;
-      const visualY = clientY - OFFSET_Y;
-
-      const gridX = visualX - rect.left - 8;
-      const gridY = visualY - rect.top - 8;
+      const gridX = clientX - rect.left - 8;
+      const gridY = (clientY - OFFSET_Y) - rect.top - 8;
 
       const shapeHalfWidth = (shape.cells[0].length * cellSize) / 2;
       const shapeHalfHeight = (shape.cells.length * cellSize) / 2;
@@ -267,10 +323,10 @@ export default function EarnPage() {
 
             <div className="grid gap-6">
               <Card 
-                className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300"
                 onClick={() => setActiveTab('puzzle')}
               >
-                <div className="relative h-48 w-full">
+                <div className="relative h-40 w-full">
                   <Image 
                     src="https://picsum.photos/seed/puzzle-game/600/400" 
                     alt="Glow Block Puzzle"
@@ -280,38 +336,105 @@ export default function EarnPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
                   <div className="absolute bottom-4 left-6">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Gamepad2 className="text-glowearn-gold" size={18} />
-                      <span className="text-glowearn-gold font-black uppercase text-xs tracking-widest">Active Challenge</span>
-                    </div>
-                    <h2 className="text-white font-headline font-black text-2xl uppercase italic">Glow Block Puzzle</h2>
+                    <h2 className="text-white font-headline font-black text-xl uppercase italic">Glow Block Puzzle</h2>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">High Rewards</p>
                   </div>
                 </div>
-                <CardContent className="p-6">
-                  <p className="text-white/60 text-xs font-medium leading-relaxed mb-6">
-                    Match blocks to clear lines and collect golden coins. The more lines you clear, the higher the rewards!
-                  </p>
-                  <button className="w-full shimmer-btn py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
-                    <Play className="text-glowearn-navy fill-glowearn-navy" size={20} />
-                    <span className="text-glowearn-navy font-black uppercase tracking-widest">Play Now</span>
-                  </button>
-                </CardContent>
               </Card>
 
-              <Card className="bg-black/40 border border-white/5 rounded-[2.5rem] overflow-hidden grayscale opacity-50 relative group">
-                <div className="absolute inset-0 flex items-center justify-center z-20">
-                  <div className="flex flex-col items-center gap-2">
-                    <Lock className="text-white/40 group-hover:text-glowearn-gold transition-colors" size={40} />
-                    <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.4em]">Coming Soon</span>
+              <Card 
+                className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300"
+                onClick={() => {
+                  setActiveTab('quick-solve');
+                  generateNewQuickPuzzle();
+                }}
+              >
+                <div className="relative h-40 w-full">
+                  <Image 
+                    src="https://picsum.photos/seed/quick-puzzle/600/400" 
+                    alt="Golden Solve"
+                    fill
+                    className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                    data-ai-hint="golden code"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
+                  <div className="absolute bottom-4 left-6">
+                    <h2 className="text-white font-headline font-black text-xl uppercase italic">Golden Solve</h2>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">+20 Coins Reward</p>
                   </div>
                 </div>
-                <div className="h-32 w-full bg-white/5 flex items-center justify-center p-8">
-                  <Zap className="text-white/10" size={60} />
-                </div>
-                <CardContent className="p-6 text-center">
-                  <h3 className="text-white/40 font-black uppercase tracking-widest text-sm italic">New Challenge Awaits</h3>
-                </CardContent>
               </Card>
+            </div>
+          </div>
+        ) : activeTab === 'quick-solve' ? (
+          <div className="w-full flex flex-col items-center space-y-8 animate-in zoom-in duration-300 max-w-sm">
+            <button 
+              onClick={() => setActiveTab('menu')}
+              className="self-start flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest bg-white/5 px-4 py-2 rounded-full transition-all"
+            >
+              <ChevronLeft size={16} /> Back to Menu
+            </button>
+
+            <header className="text-center space-y-2">
+              <h1 className="text-glowearn-gold font-headline text-3xl font-black italic uppercase">Golden Solve</h1>
+              <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Verify the golden code</p>
+            </header>
+
+            <Card className="w-full bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] p-8 space-y-8 shadow-2xl relative overflow-hidden">
+              <div className="text-center space-y-4">
+                <div className="bg-black/40 py-6 rounded-3xl border border-glowearn-gold/10">
+                  <span className="text-glowearn-gold font-headline text-5xl font-black tracking-[0.2em] italic drop-shadow-[0_0_10px_#fadb3b]">
+                    {targetCode}
+                  </span>
+                </div>
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">Enter the code above to claim gold</p>
+              </div>
+
+              <div className="space-y-4">
+                <input 
+                  type="number"
+                  value={userCode}
+                  onChange={(e) => setUserCode(e.target.value)}
+                  placeholder="Enter Code"
+                  className="w-full bg-black/60 border-2 border-glowearn-gold/20 rounded-2xl py-4 text-center text-white font-black text-2xl focus:border-glowearn-gold outline-none transition-all"
+                  maxLength={4}
+                />
+
+                {cooldownRemaining > 0 && !isAdmin && (
+                  <div className="flex items-center justify-center gap-2 text-red-400 bg-red-400/10 py-3 rounded-xl border border-red-400/20">
+                    <Clock size={14} className="animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Anti-Cheat Active: {cooldownRemaining}s</span>
+                  </div>
+                )}
+
+                <button 
+                  onClick={handleSolveQuickPuzzle}
+                  disabled={cooldownRemaining > 0 && !isAdmin}
+                  className={cn(
+                    "w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3",
+                    cooldownRemaining > 0 && !isAdmin 
+                      ? "bg-white/5 text-white/20 grayscale cursor-not-allowed" 
+                      : "shimmer-btn text-glowearn-navy shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95"
+                  )}
+                >
+                  {isAdmin ? <Sparkles size={18} /> : <CheckCircle2 size={18} />}
+                  {isAdmin ? 'Auto-Solve (Admin)' : 'Claim Reward'}
+                </button>
+              </div>
+
+              {successMessage && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-md rounded-[2.5rem] z-20 animate-in fade-in zoom-in duration-300 text-center px-6">
+                  <Sparkles className="text-glowearn-gold w-16 h-16 animate-bounce mb-4" />
+                  <h2 className="text-glowearn-gold font-headline text-2xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">
+                    {successMessage}
+                  </h2>
+                </div>
+              )}
+            </Card>
+
+            <div className="flex items-center gap-2 text-white/20 font-bold uppercase text-[9px] tracking-widest">
+              <AlertCircle size={12} />
+              <span>Limit: 1 reward per minute</span>
             </div>
           </div>
         ) : (
@@ -319,7 +442,7 @@ export default function EarnPage() {
             <div className="w-full flex items-center justify-between">
               <button 
                 onClick={() => setActiveTab('menu')}
-                className="flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest bg-white/5 px-4 py-2 rounded-full border border-white/10 transition-all"
+                className="flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest bg-white/5 px-4 py-2 rounded-full transition-all"
               >
                 <ChevronLeft size={16} /> Back to Menu
               </button>
@@ -337,7 +460,7 @@ export default function EarnPage() {
 
             <div 
               ref={boardRef}
-              className="w-full aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.6)] relative"
+              className="w-full aspect-square p-2 bg-[#0c2436]/80 rounded-[1.5rem] border-2 border-white/10 relative"
             >
               <div className="grid grid-cols-8 gap-1 h-full w-full">
                 {grid.map((row, r) => (
@@ -353,11 +476,11 @@ export default function EarnPage() {
                         key={`${r}-${c}`}
                         className={cn(
                           "aspect-square w-full rounded-sm border transition-all duration-200",
-                          cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                          cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                          cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                          cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
-                          cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300 shadow-[inset_0_0_8px_rgba(255,255,255,0.4)]",
+                          cell === 1 && "bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-300",
+                          cell === 2 && "bg-gradient-to-br from-orange-400 to-orange-600 border-orange-300",
+                          cell === 3 && "bg-gradient-to-br from-red-400 to-red-600 border-red-300",
+                          cell === 4 && "bg-gradient-to-br from-blue-400 to-blue-600 border-blue-300",
+                          cell === 5 && "bg-gradient-to-br from-purple-400 to-purple-600 border-purple-300",
                           cell === 0 && !isGhost && "bg-white/5 border-white/5",
                           isGhost && "bg-yellow-500/20 border-yellow-500/50 scale-[0.95]"
                         )}
@@ -370,15 +493,14 @@ export default function EarnPage() {
               {showLineClear && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/40 backdrop-blur-sm rounded-[1.5rem] z-20 animate-in zoom-in duration-300">
                   <Sparkles className="text-glowearn-gold animate-bounce mb-2" size={48} />
-                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">LINE CLEAR!</h2>
+                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase tracking-tighter">LINE CLEAR!</h2>
                 </div>
               )}
 
               {isGameOver && (
                 <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
                   <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
-                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic tracking-tighter uppercase mb-2">GAME OVER</h2>
-                  <p className="text-white/60 font-bold uppercase tracking-widest text-[10px] mb-6">Final Coins Earned: {score}</p>
+                  <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase mb-2">GAME OVER</h2>
                   <button 
                     onClick={resetGame}
                     className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
@@ -390,15 +512,15 @@ export default function EarnPage() {
             </div>
 
             <section className={cn("w-full space-y-4 pt-2", isGameOver && "opacity-20 pointer-events-none")}>
-              <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5 shadow-inner">
+              <div className="flex justify-around items-center w-full bg-[#0c2436]/60 p-6 rounded-[2.5rem] border border-white/5">
                 {shelf.map((shape, idx) => (
                   <div 
                     key={idx}
                     onMouseDown={(e) => handleDragStart(e, idx)}
                     onTouchStart={(e) => handleDragStart(e, idx)}
                     className={cn(
-                      "relative flex flex-col items-center justify-center h-24 w-24 rounded-2xl border transition-all cursor-grab active:cursor-grabbing",
-                      dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105 hover:border-white/20 hover:bg-white/5",
+                      "relative flex flex-col items-center justify-center h-20 w-20 rounded-2xl border transition-all cursor-grab active:cursor-grabbing",
+                      dragState.index === idx ? "opacity-0" : "bg-black/30 border-white/5 hover:scale-105",
                       !shape && "opacity-0 pointer-events-none"
                     )}
                   >
@@ -407,8 +529,8 @@ export default function EarnPage() {
                         {shape.cells.flat().map((c: number, i: number) => (
                           <div 
                             key={i} 
-                            className={cn("w-5 h-5 aspect-square rounded-[2px] border-[1px]", 
-                              c !== 0 ? "bg-glowearn-gold border-white/40 shadow-sm" : "bg-transparent border-transparent"
+                            className={cn("w-4 h-4 aspect-square rounded-[2px]", 
+                              c !== 0 ? "bg-glowearn-gold" : "bg-transparent"
                             )}
                           />
                         ))}
@@ -417,7 +539,6 @@ export default function EarnPage() {
                   </div>
                 ))}
               </div>
-              <p className="text-center text-white/40 text-[9px] font-black uppercase tracking-[0.4em] animate-pulse">Drag to earn gold coins</p>
             </section>
           </div>
         )}
@@ -426,7 +547,7 @@ export default function EarnPage() {
       {/* Drag Overlay */}
       {dragState.index !== null && shelf[dragState.index] && (
         <div 
-          className="fixed pointer-events-none z-[200] scale-[1.2] drop-shadow-[0_25px_50px_rgba(0,0,0,0.9)]"
+          className="fixed pointer-events-none z-[200] scale-[1.2]"
           style={{
             left: dragState.pos.x,
             top: dragState.pos.y - OFFSET_Y,
@@ -441,7 +562,7 @@ export default function EarnPage() {
               <div 
                 key={i} 
                 className={cn("w-8 h-8 rounded-[4px] border-2 aspect-square", 
-                  c !== 0 ? "bg-glowearn-gold border-white/60 shadow-[inset_0_0_10px_rgba(255,255,255,0.5)]" : "bg-transparent border-transparent"
+                  c !== 0 ? "bg-glowearn-gold border-white/60" : "bg-transparent border-transparent"
                 )}
               />
             ))}

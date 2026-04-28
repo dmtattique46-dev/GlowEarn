@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -43,6 +44,11 @@
         "isAdmin": {
           "type": "boolean",
           "description": "Flag indicating if the user has administrative privileges."
+        },
+        "lastQuickPuzzleAt": {
+          "type": "string",
+          "description": "Timestamp of the last time the user solved a quick puzzle.",
+          "format": "date-time"
         },
         "createdAt": {
           "type": "string",
@@ -228,43 +234,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores individual user profile data, including username, contact details, and current financial balances. The document ID (`userId`) must match the Firebase Authentication UID. Includes 'coins', 'usd', 'adsWatched', 'avatarUrl'. The 'isAdmin' field is for application logic/display, not direct rule-based authorization.",
+          "description": "Stores individual user profile data, including username, contact details, and current financial balances.",
           "params": [
             {
               "name": "userId",
               "description": "The unique Firebase Authentication User ID of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/adminRoles/{adminId}",
-        "definition": {
-          "entityName": "AdminRole",
-          "schema": {
-            "$ref": "#/backend/entities/AdminRole"
-          },
-          "description": "A dedicated collection to mark users with administrative privileges. The document ID (`adminId`) is the Firebase Authentication UID of the administrator. Used for robust, Authorization Independent security rule checks (e.g., using `exists()`) to grant admin access across the application.",
-          "params": [
-            {
-              "name": "adminId",
-              "description": "The unique Firebase Authentication User ID of the administrator."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/usernames/{username}",
-        "definition": {
-          "entityName": "UsernameRegistry",
-          "schema": {
-            "$ref": "#/backend/entities/UsernameRegistry"
-          },
-          "description": "A registry to enforce the global uniqueness of usernames. Each document's ID is the unique username itself. Contains a 'userId' field linking to the owner's document in `/users`. Used primarily for existence checks in security rules to prevent duplicate usernames upon signup.",
-          "params": [
-            {
-              "name": "username",
-              "description": "The unique username string chosen by a user."
             }
           ]
         }
@@ -276,7 +250,7 @@
           "schema": {
             "$ref": "#/backend/entities/Transaction"
           },
-          "description": "Records individual financial transactions (earnings, withdrawals) for a specific user. Authorization is handled via the parent `userId` in the path, ensuring only the owner can access their transactions. Includes denormalized 'userId' for indexing and explicit reference.",
+          "description": "Records individual financial transactions.",
           "params": [
             {
               "name": "userId",
@@ -288,44 +262,7 @@
             }
           ]
         }
-      },
-      {
-        "path": "/users/{userId}/earningRecommendations/{recommendationId}",
-        "definition": {
-          "entityName": "EarningRecommendation",
-          "schema": {
-            "$ref": "#/backend/entities/EarningRecommendation"
-          },
-          "description": "Stores AI-generated personalized earning recommendations for a specific user. Authorization is handled via the parent `userId` in the path, ensuring only the owner can access their recommendations. Includes denormalized 'userId' for indexing and explicit reference.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique Firebase Authentication User ID of the recommendation recipient."
-            },
-            {
-              "name": "recommendationId",
-              "description": "The unique identifier for the earning recommendation."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/leaderboardEntries/{leaderboardEntryId}",
-        "definition": {
-          "entityName": "LeaderboardEntry",
-          "schema": {
-            "$ref": "#/backend/entities/LeaderboardEntry"
-          },
-          "description": "A public, denormalized collection representing user rankings based on total coins earned. The document ID (`leaderboardEntryId`) is typically the `userId` it represents. Designed for global read access by all authenticated users. Updates are restricted to backend processes or administrators.",
-          "params": [
-            {
-              "name": "leaderboardEntryId",
-              "description": "The unique identifier for the leaderboard entry, typically matching the associated User ID."
-            }
-          ]
-        }
       }
-    ],
-    "reasoning": "The recommended Firestore structure for the GlowEarn application prioritizes security, scalability, and debuggability by adhering to the core design principles of Authorization Independence and Quality Access Patterns (QAPs). \n\n**Authorization Independence via Denormalization:**\n1.  **User Data (`/users/{userId}`):** Each user's primary profile data is stored in a document whose ID (`userId`) is directly the Firebase Authentication UID. This inherently denormalizes ownership, as `request.auth.uid` can be directly compared against the `userId` wildcard in security rules. No `get()` calls to parent documents are needed to verify ownership for this top-level collection.\n2.  **User-Owned Subcollections (`/users/{userId}/transactions`, `/users/{userId}/earningRecommendations`):** For data directly owned by a user (e.g., their transactions or personalized recommendations), a hierarchical path structure is used. The `userId` in the path serves as the denormalized authorization context for all documents within these subcollections. Security rules for `transactions/{transactionId}` or `earningRecommendations/{recommendationId}` can simply compare `request.auth.uid` with the `userId` segment from the path, completely eliminating the need for `get()` calls to parent documents. While the `Transaction` and `EarningRecommendation` schemas include a `userId` field, its primary role is for indexing and querying, not for authorization rules, as the path itself provides the necessary context.\n3.  **Administrative Roles (`/adminRoles/{adminId}`):** To maintain strict Authorization Independence for administrative privileges, a dedicated top-level collection (`/adminRoles`) is introduced. An administrator's UID (`adminId`) serves as the document ID in this collection. Security rules can check for the existence of a document at `/adminRoles/$(request.auth.uid)` using `exists()` without fetching the entire document or relying on the `isAdmin` field within the user's profile. This ensures admin checks are atomic and independent of the `users` collection.\n4.  **Unique Username Registry (`/usernames/{username}`):** For enforcing unique usernames globally, a dedicated collection is used where each document ID is the username itself. Security rules can check for `!exists(/usernames/$(newUsername))` during user creation, providing an atomic and independent check for uniqueness without complex queries or `get()` operations against the main `users` collection.\n5.  **Leaderboard (`/leaderboardEntries/{leaderboardEntryId}`):** This collection is designed for public read access by all authenticated users. Since its authorization posture is global read, no specific denormalization for individual document ownership is required. Updates to this collection would typically be managed by trusted backend services or administrators, ensuring data integrity without impacting read authorization independence.\n\n**Quality Access Patterns (QAPs):**\n1.  **Path-Based Ownership for User Data:** The structure `/users/{userId}/transactions` and `/users/{userId}/earningRecommendations` directly supports QAPs. Users can securely `list` and query *only their own* transactions and recommendations by forming queries scoped to their `userId` (e.g., `/users/$(request.auth.uid)/transactions`). This prevents unauthorized access to other users' private data during list operations.\n2.  **Structural Segregation for Public Data:** The `/leaderboardEntries` collection is segregated to house data with a 'public read' security posture. This clearly defines that all documents within this collection are intended for general viewing by authenticated users. Therefore, `list` operations on `/leaderboardEntries` are inherently secure as they expose only data meant to be public, supporting efficient and authorized listing for all users.\n3.  **Focused Collections for Specific Concerns:** Separating concerns like admin roles (`/adminRoles`) and username uniqueness (`/usernames`) into their own collections ensures homogeneous security requirements within each collection, simplifying rule logic and making `list` operations on these collections highly specific (e.g., an admin listing other admins, or no direct listing for usernames, only `exists()` checks).\n\nThis design leverages structural integrity and targeted denormalization to create a Firestore architecture that is robust against common security pitfalls, easy to debug, and performs efficiently under various access patterns."
+    ]
   }
 }
