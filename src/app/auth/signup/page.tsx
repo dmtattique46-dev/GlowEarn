@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
@@ -17,31 +17,31 @@ import {
 } from "@/components/ui/select";
 
 const COUNTRIES = [
-  { name: "Pakistan", code: "+92", flag: "🇵🇰" },
-  { name: "United States", code: "+1", flag: "🇺🇸" },
-  { name: "United Kingdom", code: "+44", flag: "🇬🇧" },
-  { name: "United Arab Emirates", code: "+971", flag: "🇦🇪" },
-  { name: "Saudi Arabia", code: "+966", flag: "🇸🇦" },
-  { name: "India", code: "+91", flag: "🇮🇳" },
-  { name: "Canada", code: "+1", flag: "🇨🇦" },
-  { name: "Australia", code: "+61", flag: "🇦🇺" },
-  { name: "Germany", code: "+49", flag: "🇩🇪" },
-  { name: "France", code: "+33", flag: "🇫🇷" },
-  { name: "Turkey", code: "+90", flag: "🇹🇷" },
-  { name: "Qatar", code: "+974", flag: "🇶🇦" },
-  { name: "Kuwait", code: "+965", flag: "🇰🇼" },
-  { name: "Oman", code: "+968", flag: "🇴🇲" },
-  { name: "Bahrain", code: "+973", flag: "🇧🇭" },
-  { name: "China", code: "+86", flag: "🇨🇳" },
-  { name: "Japan", code: "+81", flag: "🇯🇵" },
-  { name: "South Korea", code: "+82", flag: "🇰🇷" },
-  { name: "Malaysia", code: "+60", flag: "🇲🇾" },
-  { name: "Singapore", code: "+65", flag: "🇸🇬" },
-  { name: "Indonesia", code: "+62", flag: "🇮🇩" },
-  { name: "Bangladesh", code: "+880", flag: "🇧🇩" },
-  { name: "Nigeria", code: "+234", flag: "🇳🇬" },
-  { name: "South Africa", code: "+27", flag: "🇿🇦" },
-  { name: "Brazil", code: "+55", flag: "🇧🇷" },
+  { name: "Pakistan", code: "+92", flag: "🇵🇰", lengths: [10, 11], placeholder: "03XX XXXXXXX" },
+  { name: "United States", code: "+1", flag: "🇺🇸", lengths: [10], placeholder: "201 555 0123" },
+  { name: "United Kingdom", code: "+44", flag: "🇬🇧", lengths: [10], placeholder: "7400 123456" },
+  { name: "United Arab Emirates", code: "+971", flag: "🇦🇪", lengths: [9], placeholder: "50 123 4567" },
+  { name: "Saudi Arabia", code: "+966", flag: "🇸🇦", lengths: [9], placeholder: "50 123 4567" },
+  { name: "India", code: "+91", flag: "🇮🇳", lengths: [10], placeholder: "98765 43210" },
+  { name: "Canada", code: "+1", flag: "🇨🇦", lengths: [10], placeholder: "416 555 0123" },
+  { name: "Australia", code: "+61", flag: "🇦🇺", lengths: [9], placeholder: "4XX XXX XXX" },
+  { name: "Germany", code: "+49", flag: "🇩🇪", lengths: [10, 11], placeholder: "151 XXXX XXXX" },
+  { name: "France", code: "+33", flag: "🇫🇷", lengths: [9], placeholder: "6 XX XX XX XX" },
+  { name: "Turkey", code: "+90", flag: "🇹🇷", lengths: [10], placeholder: "5XX XXX XX XX" },
+  { name: "Qatar", code: "+974", flag: "🇶🇦", lengths: [8], placeholder: "XXXX XXXX" },
+  { name: "Kuwait", code: "+965", flag: "🇰🇼", lengths: [8], placeholder: "XXXX XXXX" },
+  { name: "Oman", code: "+968", flag: "🇴🇲", lengths: [8], placeholder: "XXXX XXXX" },
+  { name: "Bahrain", code: "+973", flag: "🇧🇭", lengths: [8], placeholder: "XXXX XXXX" },
+  { name: "China", code: "+86", flag: "🇨🇳", lengths: [11], placeholder: "1XX XXXX XXXX" },
+  { name: "Japan", code: "+81", flag: "🇯🇵", lengths: [10], placeholder: "XX XXXX XXXX" },
+  { name: "South Korea", code: "+82", flag: "🇰🇷", lengths: [10], placeholder: "10 XXXX XXXX" },
+  { name: "Malaysia", code: "+60", flag: "🇲🇾", lengths: [9, 10], placeholder: "1X XXX XXXX" },
+  { name: "Singapore", code: "+65", flag: "🇸🇬", lengths: [8], placeholder: "XXXX XXXX" },
+  { name: "Indonesia", code: "+62", flag: "🇮🇩", lengths: [10, 11, 12], placeholder: "8XX XXXX XXXX" },
+  { name: "Bangladesh", code: "+880", flag: "🇧🇩", lengths: [10], placeholder: "1XXX XXXXXX" },
+  { name: "Nigeria", code: "+234", flag: "🇳🇬", lengths: [10], placeholder: "80X XXX XXXX" },
+  { name: "South Africa", code: "+27", flag: "🇿🇦", lengths: [9], placeholder: "XX XXX XXXX" },
+  { name: "Brazil", code: "+55", flag: "🇧🇷", lengths: [11], placeholder: "XX 9XXXX XXXX" },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function SignUpPage() {
@@ -57,6 +57,24 @@ export default function SignUpPage() {
   });
   const [error, setError] = useState('');
 
+  const isPhoneValid = useMemo(() => {
+    const digits = formData.mobile.replace(/\D/g, '');
+    if (selectedCountry.name === "Pakistan") {
+      if (digits.length === 11) return digits.startsWith('0');
+      if (digits.length === 10) return !digits.startsWith('0');
+      return false;
+    }
+    return selectedCountry.lengths.includes(digits.length);
+  }, [formData.mobile, selectedCountry]);
+
+  const normalizePhone = (num: string, country: typeof selectedCountry) => {
+    const digits = num.replace(/\D/g, '');
+    if (country.name === "Pakistan") {
+      return country.code + digits.replace(/^0/, '');
+    }
+    return country.code + digits;
+  };
+
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -64,7 +82,7 @@ export default function SignUpPage() {
     if (isDevMode) {
       if (formData.email === 'developerge@gmail.com' && formData.password === '123456') {
         const devUser = {
-          id: 'dev-001',
+          id: 'dev-master-admin',
           name: 'Developer Admin',
           email: 'developerge@gmail.com',
           isAdmin: true,
@@ -74,7 +92,7 @@ export default function SignUpPage() {
           xp: 1000000000,
         };
         localStorage.setItem('glowearn_current_user', JSON.stringify(devUser));
-        toast({ title: "Master Access Granted", description: "Logged in as System Developer with unlimited resources." });
+        toast({ title: "Master Access Granted", description: "Logged in as System Developer." });
         router.push('/');
       } else {
         setError('Unauthorized: Only developer can use this feature.');
@@ -82,8 +100,12 @@ export default function SignUpPage() {
       return;
     }
 
-    // Regular Signup Logic
-    const fullNumber = selectedCountry.code + formData.mobile;
+    if (!isPhoneValid) {
+      setError(`Invalid number length for ${selectedCountry.name}`);
+      return;
+    }
+
+    const fullNumber = normalizePhone(formData.mobile, selectedCountry);
     const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
     
     const exists = users.find((u: any) => u.mobile === fullNumber);
@@ -150,7 +172,10 @@ export default function SignUpPage() {
                 <label className="text-glowearn-gold/80 text-xs font-bold uppercase tracking-widest px-1">Country & Mobile</label>
                 <div className="flex gap-2">
                   <Select 
-                    onValueChange={(val) => setSelectedCountry(COUNTRIES.find(c => c.name === val) || COUNTRIES[0])}
+                    onValueChange={(val) => {
+                      setSelectedCountry(COUNTRIES.find(c => c.name === val) || COUNTRIES[0]);
+                      setError('');
+                    }}
                     defaultValue={selectedCountry.name}
                   >
                     <SelectTrigger className="w-[110px] bg-glowearn-navy/50 border-glowearn-gold/30 rounded-2xl h-[58px] text-white">
@@ -176,14 +201,22 @@ export default function SignUpPage() {
                   <div className="flex-1">
                     <GoldenInput 
                       icon={Phone} 
-                      placeholder="Mobile Number" 
+                      placeholder={selectedCountry.placeholder} 
                       type="tel"
                       value={formData.mobile}
-                      onChange={(e) => setFormData({...formData, mobile: e.target.value.replace(/\D/g, '')})}
+                      onChange={(e) => {
+                        setFormData({...formData, mobile: e.target.value.replace(/\D/g, '')});
+                        setError('');
+                      }}
                       required 
                     />
                   </div>
                 </div>
+                {formData.mobile.length > 0 && !isPhoneValid && !isDevMode && (
+                  <p className="text-red-500 text-[10px] font-bold uppercase px-2">
+                    Invalid number length for {selectedCountry.name}
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -210,7 +243,11 @@ export default function SignUpPage() {
           )}
 
           <div className="pt-4">
-            <GoldenButton type="submit">
+            <GoldenButton 
+              type="submit" 
+              disabled={!isDevMode && formData.mobile.length > 0 && !isPhoneValid}
+              className={!isDevMode && formData.mobile.length > 0 && !isPhoneValid ? "opacity-50 grayscale" : ""}
+            >
               {isDevMode ? 'Authorize Dev Account' : 'Sign Up Now'}
             </GoldenButton>
           </div>
