@@ -5,13 +5,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
-import { Sparkles, Trophy, RotateCcw, Zap, Gamepad2, ChevronLeft, Lock, Play, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Sparkles, Trophy, RotateCcw, Zap, Gamepad2, ChevronLeft, Lock, Play, Clock, CheckCircle2, AlertCircle, ExternalLink, PlayCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import Image from 'next/image';
 import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, increment, serverTimestamp } from 'firebase/firestore';
+import { Progress } from "@/components/ui/progress";
 
 // Game Constants
 const ROWS = 8;
@@ -19,7 +20,7 @@ const COLS = 8;
 const OFFSET_Y = 80;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
-type GameState = 'menu' | 'puzzle' | 'quick-solve';
+type GameState = 'menu' | 'puzzle' | 'quick-solve' | 'watch-boost';
 
 const SHAPES = [
   { id: 'square', cells: [[1, 1], [1, 1]], color: 1 },
@@ -46,6 +47,12 @@ export default function EarnPage() {
   const [userCode, setUserCode] = useState<string>('');
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Watch & Boost State
+  const [adTimer, setAdTimer] = useState<number>(0);
+  const [isAdLoading, setIsAdLoading] = useState(false);
+  const AD_THRESHOLD = 1500;
+  const AD_URL = "https://www.highrevenuenetwork.com/your-smart-link-here"; // Adsterra Smart Link Placeholder
 
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +135,47 @@ export default function EarnPage() {
     } else {
       triggerHaptic(100);
     }
+  };
+
+  // Watch & Boost Logic
+  const handleWatchAd = () => {
+    if (adTimer > 0) return;
+    
+    window.open(AD_URL, '_blank');
+    setIsAdLoading(true);
+    
+    // Admin bypass: shorter wait
+    const waitTime = isAdmin ? 3 : 15;
+    setAdTimer(waitTime);
+    
+    const timer = setInterval(() => {
+      setAdTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          completeAdWatch();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const completeAdWatch = () => {
+    if (!userRef) return;
+    
+    updateDocumentNonBlocking(userRef, {
+      adsWatched: increment(1),
+      xp: increment(5),
+      updatedAt: serverTimestamp()
+    });
+    
+    setIsAdLoading(false);
+    setSuccessMessage('Ad Verified! +1 Progress Added');
+    triggerHaptic([100, 50, 100]);
+    
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 2000);
   };
 
   // Block Puzzle Logic
@@ -364,6 +412,26 @@ export default function EarnPage() {
                   </div>
                 </div>
               </Card>
+
+              <Card 
+                className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl group hover:border-glowearn-gold transition-all duration-300"
+                onClick={() => setActiveTab('watch-boost')}
+              >
+                <div className="relative h-40 w-full">
+                  <Image 
+                    src="https://picsum.photos/seed/ads-boost/600/400" 
+                    alt="Watch & Boost"
+                    fill
+                    className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                    data-ai-hint="gold stars"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
+                  <div className="absolute bottom-4 left-6">
+                    <h2 className="text-white font-headline font-black text-xl uppercase italic">Watch & Boost</h2>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">Unlock Withdrawals</p>
+                  </div>
+                </div>
+              </Card>
             </div>
           </div>
         ) : activeTab === 'quick-solve' ? (
@@ -435,6 +503,72 @@ export default function EarnPage() {
             <div className="flex items-center gap-2 text-white/20 font-bold uppercase text-[9px] tracking-widest">
               <AlertCircle size={12} />
               <span>Limit: 1 reward per minute</span>
+            </div>
+          </div>
+        ) : activeTab === 'watch-boost' ? (
+          <div className="w-full flex flex-col items-center space-y-8 animate-in zoom-in duration-300 max-w-sm">
+            <button 
+              onClick={() => setActiveTab('menu')}
+              className="self-start flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest bg-white/5 px-4 py-2 rounded-full transition-all"
+            >
+              <ChevronLeft size={16} /> Back to Menu
+            </button>
+
+            <header className="text-center space-y-2">
+              <h1 className="text-glowearn-gold font-headline text-3xl font-black italic uppercase">Watch & Boost</h1>
+              <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Increase your ad verification count</p>
+            </header>
+
+            <Card className="w-full bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] p-8 space-y-8 shadow-2xl relative overflow-hidden">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                  <span className="text-white/60">Ads Watched Progress</span>
+                  <span className="text-glowearn-gold">
+                    {userData?.adsWatched || 0} / {AD_THRESHOLD}
+                  </span>
+                </div>
+                <Progress 
+                  value={((userData?.adsWatched || 0) / AD_THRESHOLD) * 100} 
+                  className="h-3 bg-black/40 [&>div]:bg-glowearn-gold" 
+                />
+              </div>
+
+              <div className="space-y-6">
+                <button 
+                  onClick={handleWatchAd}
+                  disabled={adTimer > 0}
+                  className={cn(
+                    "w-full py-6 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center justify-center gap-2",
+                    adTimer > 0 
+                      ? "bg-white/5 text-white/20 grayscale cursor-not-allowed" 
+                      : "shimmer-btn text-glowearn-navy shadow-[0_15px_40px_rgba(250,219,59,0.3)] active:scale-95"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {adTimer > 0 ? <Loader2 className="animate-spin" size={24} /> : <PlayCircle size={24} />}
+                    <span className="text-lg">{adTimer > 0 ? `Verifying... ${adTimer}s` : 'Watch Video Ad'}</span>
+                  </div>
+                  {!adTimer && <span className="text-[10px] opacity-70">Opens Smart Link</span>}
+                </button>
+
+                <p className="text-[10px] text-white/40 text-center font-bold uppercase leading-relaxed px-4">
+                  Stay on the page for 15 seconds after opening the link to verify your activity and earn progress.
+                </p>
+              </div>
+
+              {successMessage && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-md rounded-[2.5rem] z-20 animate-in fade-in zoom-in duration-300 text-center px-6">
+                  <Sparkles className="text-glowearn-gold w-16 h-16 animate-bounce mb-4" />
+                  <h2 className="text-glowearn-gold font-headline text-2xl font-black italic uppercase tracking-tighter drop-shadow-[0_0_15px_#fadb3b]">
+                    {successMessage}
+                  </h2>
+                </div>
+              )}
+            </Card>
+
+            <div className="flex items-center gap-2 text-white/20 font-bold uppercase text-[9px] tracking-widest">
+              <ShieldCheck size={12} />
+              <span>Anti-Fraud System Active</span>
             </div>
           </div>
         ) : (
