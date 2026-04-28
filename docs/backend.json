@@ -1,61 +1,215 @@
 {
   "entities": {
-    "UserProfile": {
+    "User": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserProfile",
+      "title": "User",
       "type": "object",
-      "description": "Represents a user's profile information, digital wallet balance, and points within the GlowEarn application. This entity stores data essential for user identification, personalized features, and leaderboard participation.",
+      "description": "Represents a user account in the GlowEarn application, storing profile information, financial summaries, and administrative flags.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the UserProfile entity."
+          "description": "Unique identifier for the User entity."
         },
-        "name": {
+        "username": {
           "type": "string",
-          "description": "The full name of the user as provided during account creation."
-        },
-        "mobileNumber": {
-          "type": "string",
-          "description": "The user's unique mobile phone number. This is used for login, unique signup validation, and serves as a primary contact identifier."
+          "description": "Unique username chosen by the user."
         },
         "email": {
           "type": "string",
-          "description": "The user's unique email address. This is used for login, unique signup validation, and can be used for communication.",
+          "description": "The user's email address, used for authentication and communication.",
           "format": "email"
+        },
+        "mobileNumber": {
+          "type": "string",
+          "description": "The user's mobile phone number."
+        },
+        "coins": {
+          "type": "number",
+          "description": "The current balance of 'coins' earned by the user within the app."
+        },
+        "usd": {
+          "type": "number",
+          "description": "The current balance of USD equivalent earnings for the user."
+        },
+        "adsWatched": {
+          "type": "number",
+          "description": "Count of advertisements the user has watched."
         },
         "avatarUrl": {
           "type": "string",
-          "description": "URL to the user's customizable golden circular avatar image. If not set, a default avatar might be used.",
+          "description": "URL to the user's customizable golden circular avatar image.",
           "format": "uri"
         },
-        "balance": {
-          "type": "number",
-          "description": "The user's current digital wallet balance. It is initialized to 0.00 upon signup and updated through earning activities."
-        },
-        "points": {
-          "type": "number",
-          "description": "The user's current points, used for leaderboard ranking. It is initialized to 0 upon signup and increases with app engagement and earning activities."
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Flag indicating if the user has administrative privileges."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the user profile was initially created.",
+          "description": "Timestamp when the user account was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating the last time the user profile information was updated.",
+          "description": "Timestamp of the last update to the user's profile.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
-        "name",
-        "mobileNumber",
+        "username",
         "email",
-        "balance",
-        "points",
+        "mobileNumber",
+        "coins",
+        "usd",
+        "adsWatched",
+        "isAdmin",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    "Transaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transaction",
+      "type": "object",
+      "description": "Records individual financial movements, such as earnings or withdrawals, related to a user's wallet.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Transaction entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who performed or is affected by this transaction. (Relationship: User 1:N Transaction)"
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of transaction (e.g., 'earn_ad', 'withdraw_paypal', 'bonus')."
+        },
+        "amountCoins": {
+          "type": "number",
+          "description": "The amount of coins involved in this transaction."
+        },
+        "amountUSD": {
+          "type": "number",
+          "description": "The USD equivalent amount involved in this transaction."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description or memo for the transaction."
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "Timestamp when the transaction occurred.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "type",
+        "amountCoins",
+        "amountUSD",
+        "description",
+        "transactionDate"
+      ]
+    },
+    "EarningRecommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "EarningRecommendation",
+      "type": "object",
+      "description": "Stores AI-generated personalized recommendations for users to optimize their earning potential.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the EarningRecommendation entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User for whom this recommendation is generated. (Relationship: User 1:N EarningRecommendation)"
+        },
+        "title": {
+          "type": "string",
+          "description": "A short, descriptive title for the earning recommendation."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed explanation of the earning recommendation."
+        },
+        "type": {
+          "type": "string",
+          "description": "The category or type of earning activity recommended (e.g., 'ad_campaign', 'survey', 'task')."
+        },
+        "potentialCoins": {
+          "type": "number",
+          "description": "The estimated coins a user can earn by completing this recommendation."
+        },
+        "potentialUSD": {
+          "type": "number",
+          "description": "The estimated USD equivalent a user can earn by completing this recommendation."
+        },
+        "isCompleted": {
+          "type": "boolean",
+          "description": "Indicates whether the user has completed this specific earning recommendation."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this recommendation was generated.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of the last update to this recommendation's status or details.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "description",
+        "type",
+        "potentialCoins",
+        "potentialUSD",
+        "isCompleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LeaderboardEntry": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LeaderboardEntry",
+      "type": "object",
+      "description": "Represents a user's entry on the leaderboard, typically a denormalized view of their total earnings for ranking purposes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the LeaderboardEntry entity. This could often be identical to the userId."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User associated with this leaderboard entry. (Relationship: User 1:1 LeaderboardEntry)"
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the user, denormalized for efficient leaderboard display."
+        },
+        "totalCoinsEarned": {
+          "type": "number",
+          "description": "The total number of coins a user has earned, used for ranking."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Timestamp when this leaderboard entry was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "username",
+        "totalCoinsEarned",
+        "lastUpdated"
       ]
     }
   },
@@ -70,68 +224,108 @@
       {
         "path": "/users/{userId}",
         "definition": {
-          "entityName": "UserProfile",
+          "entityName": "User",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/backend/entities/User"
           },
-          "description": "Stores the complete, private profile information for each user. The document ID `{userId}` matches the Firebase Authentication UID, which is also stored in the 'id' field within the document. This structure ensures explicit ownership and authorization independence.",
+          "description": "Stores individual user profile data, including username, contact details, and current financial balances. The document ID (`userId`) must match the Firebase Authentication UID. Includes 'coins', 'usd', 'adsWatched', 'avatarUrl'. The 'isAdmin' field is for application logic/display, not direct rule-based authorization.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique Firebase Authentication User ID, serving as the document identifier and owner."
+              "description": "The unique Firebase Authentication User ID of the user."
             }
           ]
         }
       },
       {
-        "path": "/unique_mobile_numbers/{mobileNumber}",
+        "path": "/adminRoles/{adminId}",
         "definition": {
-          "entityName": "UniqueMobileNumber",
+          "entityName": "AdminRole",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/backend/entities/AdminRole"
           },
-          "description": "A lookup collection to ensure the uniqueness of mobile numbers during user signup. Each document's ID is a unique mobile number, and it contains the associated 'userId'. This facilitates atomic uniqueness checks.",
+          "description": "A dedicated collection to mark users with administrative privileges. The document ID (`adminId`) is the Firebase Authentication UID of the administrator. Used for robust, Authorization Independent security rule checks (e.g., using `exists()`) to grant admin access across the application.",
           "params": [
             {
-              "name": "mobileNumber",
-              "description": "The unique mobile number string used as the document identifier."
+              "name": "adminId",
+              "description": "The unique Firebase Authentication User ID of the administrator."
             }
           ]
         }
       },
       {
-        "path": "/unique_emails/{email}",
+        "path": "/usernames/{username}",
         "definition": {
-          "entityName": "UniqueEmail",
+          "entityName": "UsernameRegistry",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/backend/entities/UsernameRegistry"
           },
-          "description": "A lookup collection to ensure the uniqueness of email addresses during user signup. Each document's ID is a unique email address, and it contains the associated 'userId'. This facilitates atomic uniqueness checks.",
+          "description": "A registry to enforce the global uniqueness of usernames. Each document's ID is the unique username itself. Contains a 'userId' field linking to the owner's document in `/users`. Used primarily for existence checks in security rules to prevent duplicate usernames upon signup.",
           "params": [
             {
-              "name": "email",
-              "description": "The unique email address string used as the document identifier."
+              "name": "username",
+              "description": "The unique username string chosen by a user."
             }
           ]
         }
       },
       {
-        "path": "/leaderboard_profiles/{userId}",
+        "path": "/users/{userId}/transactions/{transactionId}",
         "definition": {
-          "entityName": "LeaderboardProfile",
+          "entityName": "Transaction",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/backend/entities/Transaction"
           },
-          "description": "A denormalized collection containing public user data (name, points, avatarUrl, userId) specifically for the leaderboard display. It allows for efficient and secure public queries without exposing private user details. Includes denormalized 'userId' field for explicit ownership and update authorization.",
+          "description": "Records individual financial transactions (earnings, withdrawals) for a specific user. Authorization is handled via the parent `userId` in the path, ensuring only the owner can access their transactions. Includes denormalized 'userId' for indexing and explicit reference.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique Firebase Authentication User ID, serving as the document identifier for the public profile."
+              "description": "The unique Firebase Authentication User ID of the transaction owner."
+            },
+            {
+              "name": "transactionId",
+              "description": "The unique identifier for the transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/earningRecommendations/{recommendationId}",
+        "definition": {
+          "entityName": "EarningRecommendation",
+          "schema": {
+            "$ref": "#/backend/entities/EarningRecommendation"
+          },
+          "description": "Stores AI-generated personalized earning recommendations for a specific user. Authorization is handled via the parent `userId` in the path, ensuring only the owner can access their recommendations. Includes denormalized 'userId' for indexing and explicit reference.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication User ID of the recommendation recipient."
+            },
+            {
+              "name": "recommendationId",
+              "description": "The unique identifier for the earning recommendation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/leaderboardEntries/{leaderboardEntryId}",
+        "definition": {
+          "entityName": "LeaderboardEntry",
+          "schema": {
+            "$ref": "#/backend/entities/LeaderboardEntry"
+          },
+          "description": "A public, denormalized collection representing user rankings based on total coins earned. The document ID (`leaderboardEntryId`) is typically the `userId` it represents. Designed for global read access by all authenticated users. Updates are restricted to backend processes or administrators.",
+          "params": [
+            {
+              "name": "leaderboardEntryId",
+              "description": "The unique identifier for the leaderboard entry, typically matching the associated User ID."
             }
           ]
         }
       }
     ],
-    "reasoning": "The recommended Firestore structure is designed to adhere strictly to the core design principles, especially Authorization Independence and QAPs (Queries as Permissions), while addressing the unique signup logic. It segregates data based on its security posture and access patterns.\n\n1.  **UserProfile Data (`/users/{userId}`):** This collection stores the complete, private `UserProfile` for each user. Ownership is inherently established by the path itself, where `{userId}` directly corresponds to the authenticated user's ID (`request.auth.uid`). The `UserProfile` document's `id` field will also store this `userId`, ensuring denormalized ownership within the document for clarity and robustness. This achieves **Authorization Independence** as no `get()` calls to parent documents are required for authorization; the document's path and its internal `id` field explicitly define ownership. This collection is intended for individual document reads, updates, and deletes by the owner.\n\n2.  **Unique Identifier Collections (`/unique_mobile_numbers/{mobileNumber}` and `/unique_emails/{email}`):** To enforce the unique signup requirement for `mobileNumber` and `email`, two dedicated collections are introduced. Each document in these collections will store the `userId` associated with the unique mobile number or email. This pattern enables efficient, server-side atomic checks (e.g., using Firestore transactions in Cloud Functions) to verify uniqueness during signup. **Authorization Independence** is maintained as these are distinct, top-level collections whose existence or non-existence is used for validation, not for dependent authorization logic. Reads on these collections are generally restricted to the backend for security, preventing clients from enumerating existing numbers/emails.\n\n3.  **Leaderboard Profiles (`/leaderboard_profiles/{userId}`):** To support the 'Interactive Leaderboard Display' core feature while maintaining **QAPs (Queries as Permissions)**, a separate, denormalized collection is created. This collection stores a public subset of `UserProfile` data (e.g., `userId`, `name`, `points`, `avatarUrl`) that is safe for public queries. This adheres to **Structural Segregation** by separating public-facing data from private user details. All documents in this collection share the same security posture (publicly readable), meaning any `list` query can be performed without requiring complex, potentially insecure, field-level filtering in security rules. Updates to a user's leaderboard profile are still restricted to the owner (`request.auth.uid == userId`), ensuring **Authorization Independence** for write operations.\n\nThis architecture ensures that security rules are simple, explicit, and easy to debug. It avoids complex `get()` dependencies, supports atomic operations for unique user creation, and provides a scalable solution for public leaderboard data consistent with QAP principles."
+    "reasoning": "The recommended Firestore structure for the GlowEarn application prioritizes security, scalability, and debuggability by adhering to the core design principles of Authorization Independence and Quality Access Patterns (QAPs). \n\n**Authorization Independence via Denormalization:**\n1.  **User Data (`/users/{userId}`):** Each user's primary profile data is stored in a document whose ID (`userId`) is directly the Firebase Authentication UID. This inherently denormalizes ownership, as `request.auth.uid` can be directly compared against the `userId` wildcard in security rules. No `get()` calls to parent documents are needed to verify ownership for this top-level collection.\n2.  **User-Owned Subcollections (`/users/{userId}/transactions`, `/users/{userId}/earningRecommendations`):** For data directly owned by a user (e.g., their transactions or personalized recommendations), a hierarchical path structure is used. The `userId` in the path serves as the denormalized authorization context for all documents within these subcollections. Security rules for `transactions/{transactionId}` or `earningRecommendations/{recommendationId}` can simply compare `request.auth.uid` with the `userId` segment from the path, completely eliminating the need for `get()` calls to parent documents. While the `Transaction` and `EarningRecommendation` schemas include a `userId` field, its primary role is for indexing and querying, not for authorization rules, as the path itself provides the necessary context.\n3.  **Administrative Roles (`/adminRoles/{adminId}`):** To maintain strict Authorization Independence for administrative privileges, a dedicated top-level collection (`/adminRoles`) is introduced. An administrator's UID (`adminId`) serves as the document ID in this collection. Security rules can check for the existence of a document at `/adminRoles/$(request.auth.uid)` using `exists()` without fetching the entire document or relying on the `isAdmin` field within the user's profile. This ensures admin checks are atomic and independent of the `users` collection.\n4.  **Unique Username Registry (`/usernames/{username}`):** For enforcing unique usernames globally, a dedicated collection is used where each document ID is the username itself. Security rules can check for `!exists(/usernames/$(newUsername))` during user creation, providing an atomic and independent check for uniqueness without complex queries or `get()` operations against the main `users` collection.\n5.  **Leaderboard (`/leaderboardEntries/{leaderboardEntryId}`):** This collection is designed for public read access by all authenticated users. Since its authorization posture is global read, no specific denormalization for individual document ownership is required. Updates to this collection would typically be managed by trusted backend services or administrators, ensuring data integrity without impacting read authorization independence.\n\n**Quality Access Patterns (QAPs):**\n1.  **Path-Based Ownership for User Data:** The structure `/users/{userId}/transactions` and `/users/{userId}/earningRecommendations` directly supports QAPs. Users can securely `list` and query *only their own* transactions and recommendations by forming queries scoped to their `userId` (e.g., `/users/$(request.auth.uid)/transactions`). This prevents unauthorized access to other users' private data during list operations.\n2.  **Structural Segregation for Public Data:** The `/leaderboardEntries` collection is segregated to house data with a 'public read' security posture. This clearly defines that all documents within this collection are intended for general viewing by authenticated users. Therefore, `list` operations on `/leaderboardEntries` are inherently secure as they expose only data meant to be public, supporting efficient and authorized listing for all users.\n3.  **Focused Collections for Specific Concerns:** Separating concerns like admin roles (`/adminRoles`) and username uniqueness (`/usernames`) into their own collections ensures homogeneous security requirements within each collection, simplifying rule logic and making `list` operations on these collections highly specific (e.g., an admin listing other admins, or no direct listing for usernames, only `exists()` checks).\n\nThis design leverages structural integrity and targeted denormalization to create a Firestore architecture that is robust against common security pitfalls, easy to debug, and performs efficiently under various access patterns."
   }
 }

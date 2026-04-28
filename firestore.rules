@@ -1,132 +1,141 @@
+/**
+ * GlowEarn Security Rules
+ * 
+ * Core Philosophy:
+ * This ruleset implements a strict path-based ownership model combined with administrative overrides.
+ * Authorization is primarily determined by the document path (UID matching), ensuring that users 
+ * can only access their own financial and profile data without requiring expensive cross-document lookups.
+ * 
+ * Data Structure:
+ * - /users/{userId}: Primary profile and balance data.
+ * - /users/{userId}/transactions: Private history of earnings/withdrawals.
+ * - /users/{userId}/earningRecommendations: Personalized AI suggestions.
+ * - /adminRoles/{adminId}: A registry of UIDs granted elevated privileges.
+ * - /usernames/{username}: A registry used to ensure global uniqueness of handles.
+ * - /leaderboardEntries/{id}: Publicly readable ranking data.
+ * 
+ * Key Security Decisions:
+ * - Authorization Independence: By nesting user-specific data under /users/{userId}, we use the 
+ *   wildcard in the path for immediate ownership verification.
+ * - Global Admin Bypass: The user 'developerge@gmail.com' and any UID present in /adminRoles 
+ *   bypass standard ownership restrictions.
+ * - Unique Registry Pattern: Usernames are managed in a separate collection to allow for 
+ *   atomic availability checks during the signup process.
+ * - Relational Integrity: Critical fields like 'userId' or 'id' are validated to match 
+ *   the document path during creation and are made immutable during updates.
+ */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * GLOWEARN SECURITY RULES - PROTOTYPING MODE
-     * 
-     * Core Philosophy:
-     * This ruleset implements a strict user-ownership model while maintaining a public leaderboard. 
-     * Security is centered around the Firebase Auth UID. Private user data is isolated, 
-     * while public profile fragments are segregated to allow for open querying.
-     * 
-     * Data Structure:
-     * - /users/{userId}: Private profile data, wallet balances, and settings. Access restricted to the owner.
-     * - /leaderboard_profiles/{userId}: Public-facing data (name, points). Read-only for everyone, writeable by owner.
-     * - /unique_mobile_numbers/{mobileNumber} & /unique_emails/{email}: Lookup collections to ensure identity uniqueness.
-     * 
-     * Key Security Decisions:
-     * - Denormalization: The 'id' (or 'userId') field is required within documents to ensure relational integrity 
-     *   between the path and the data without performing additional 'get()' calls.
-     * - Unique Identifiers: Writes to uniqueness collections are permitted only if the data contains 
-     *   the authenticated user's UID, preventing users from "squatting" on multiple identities.
-     * - Sign-Out/Persistence: Rules rely on 'request.auth'. If 'auth' is null (signed out), access to 
-     *   private collections is immediately revoked.
-     */
-
     // --- Helper Functions ---
 
-    /** Checks if the user is authenticated with Firebase Auth. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** Checks if the provided UID matches the authenticated user. */
+    /**
+     * Checks if the current user is the owner based on the provided userId.
+     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** 
-     * Checks if the user is the owner of the existing document. 
-     * Used for update and delete operations to ensure the document exists and is owned.
+    /**
+     * Checks if the authenticated user has administrative privileges.
+     * Includes a specific bypass for the developer email and checks the /adminRoles collection.
      */
-    function isExistingOwner(ownerId) {
-      return resource != null && isSignedIn() && request.auth.uid == ownerId;
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == 'developerge@gmail.com' || exists(/databases/$(database)/documents/adminRoles/$(request.auth.uid)));
+    }
+
+    /**
+     * Checks ownership for an existing document and ensures the document exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
 
     // --- Collection Rules ---
 
     /**
-     * @description Rules for the primary UserProfile collection. Stores private wallet and contact info.
+     * @description Rules for user profile documents containing balances and settings.
      * @path /users/{userId}
-     * @allow (get, list, create, update) if the authenticated UID matches the {userId} path variable.
-     * @deny (create) if the internal 'id' field does not match the {userId} path.
-     * @principle Restricts access to a user's own data tree and enforces internal relational integrity.
+     * @allow (get) If user is owner or admin.
+     * @deny (create) If request.auth.uid does not match the userId in the path.
+     * @principle Path-based ownership and relational integrity between path and data.
      */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      
-      allow create: if isOwner(userId) 
-        && request.resource.data.id == userId;
-
-      allow update: if isExistingOwner(userId) 
-        && request.resource.data.id == resource.data.id;
-
-      allow delete: if isExistingOwner(userId);
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if (isExistingOwner(userId) || isAdmin()) && request.resource.data.id == resource.data.id;
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Publicly readable profile subset used for the application leaderboard.
-     * @path /leaderboard_profiles/{userId}
-     * @allow (get, list) for any user (public).
-     * @allow (create, update) if the authenticated user is the owner.
-     * @principle Structural Segregation: separates public queryable data from private profile data.
+     * @description Private subcollection of financial transactions.
+     * @path /users/{userId}/transactions/{transactionId}
+     * @allow (list) If user owns the parent user document.
+     * @deny (update) By standard users; transactions are generally immutable for users.
+     * @principle Hierarchical path-based authorization.
      */
-    match /leaderboard_profiles/{userId} {
-      allow get, list: if true;
-
-      allow create: if isOwner(userId);
-
-      allow update: if isExistingOwner(userId);
-
-      allow delete: if isExistingOwner(userId);
+    match /users/{userId}/transactions/{transactionId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update, delete: if isAdmin();
     }
 
     /**
-     * @description Lookup collection to prevent duplicate mobile number registrations.
-     * @path /unique_mobile_numbers/{mobileNumber}
-     * @allow (get) for signed-in users to check availability.
-     * @allow (create) if the user registers their own UID to this number.
-     * @deny (list) to prevent attackers from scraping the list of registered numbers.
-     * @principle Atomic uniqueness check with owner-only writes.
+     * @description AI-generated earning recommendations personalized for each user.
+     * @path /users/{userId}/earningRecommendations/{recommendationId}
+     * @allow (update) User can update to mark as 'isCompleted'.
+     * @deny (create) By standard users; these are system-generated.
+     * @principle Restricts creation to system/admin while allowing user interaction.
      */
-    match /unique_mobile_numbers/{mobileNumber} {
+    match /users/{userId}/earningRecommendations/{recommendationId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isAdmin();
+      allow update: if (isExistingOwner(userId) || isAdmin()) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Global registry for enforcing unique usernames.
+     * @path /usernames/{username}
+     * @allow (get) For all signed-in users to check if a username is taken.
+     * @deny (list) To prevent scraping the entire user directory.
+     * @principle Unique lookup pattern for global constraints.
+     */
+    match /usernames/{username} {
       allow get: if isSignedIn();
       allow list: if false;
-
-      allow create: if isSignedIn() 
-        && request.resource.data.userId == request.auth.uid;
-
-      allow update: if resource != null 
-        && resource.data.userId == request.auth.uid 
-        && request.resource.data.userId == resource.data.userId;
-
-      allow delete: if resource != null 
-        && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Lookup collection to prevent duplicate email registrations.
-     * @path /unique_emails/{email}
-     * @allow (get) for signed-in users to check availability.
-     * @allow (create) if the user registers their own UID to this email.
-     * @deny (list) to prevent attackers from scraping user emails.
-     * @principle Atomic uniqueness check with owner-only writes.
+     * @description Collection used to define administrative roles.
+     * @path /adminRoles/{adminId}
+     * @allow (get, list, write) Only for existing administrators.
+     * @deny (write) For any non-admin user.
+     * @principle Role-based access control (RBAC) via dedicated registry.
      */
-    match /unique_emails/{email} {
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      allow create: if isSignedIn() 
-        && request.resource.data.userId == request.auth.uid;
-
-      allow update: if resource != null 
-        && resource.data.userId == request.auth.uid 
-        && request.resource.data.userId == resource.data.userId;
-
-      allow delete: if resource != null 
-        && resource.data.userId == request.auth.uid;
+    match /adminRoles/{adminId} {
+      allow get, list, create, update, delete: if isAdmin();
     }
 
+    /**
+     * @description Publicly visible leaderboard based on total earnings.
+     * @path /leaderboardEntries/{leaderboardEntryId}
+     * @allow (get, list) For all signed-in users.
+     * @deny (write) For standard users; entries are managed by system processes.
+     * @principle Public read with authorized system-level writes.
+     */
+    match /leaderboardEntries/{leaderboardEntryId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
