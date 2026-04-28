@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
-import { User, Phone, Mail, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
+import { User, Phone, Mail, Lock, AlertCircle, ShieldCheck, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -15,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useFirestore } from '@/firebase';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 
 const COUNTRIES = [
   { name: "Pakistan", code: "+92", flag: "🇵🇰", lengths: [10, 11], placeholder: "03XX XXXXXXX" },
@@ -47,7 +49,9 @@ const COUNTRIES = [
 export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [isDevMode, setIsDevMode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES.find(c => c.name === "Pakistan") || COUNTRIES[0]);
   const [formData, setFormData] = useState({
     name: '',
@@ -75,7 +79,7 @@ export default function SignUpPage() {
     return country.code + digits;
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -105,37 +109,57 @@ export default function SignUpPage() {
       return;
     }
 
-    const fullNumber = normalizePhone(formData.mobile, selectedCountry);
-    const users = JSON.parse(localStorage.getItem('glowearn_users') || '[]');
-    
-    const exists = users.find((u: any) => u.mobile === fullNumber);
-    if (exists) {
-      setError('This number already exists! Please login instead.');
-      return;
+    setIsSubmitting(true);
+    try {
+      // 1. Unique Username Check
+      const username = formData.name.trim();
+      const usernameRef = doc(firestore, 'usernames', username);
+      const usernameDoc = await getDoc(usernameRef);
+
+      if (usernameDoc.exists()) {
+        const suggestedName = `${username}${Math.floor(Math.random() * 100)}`;
+        setError(`Username already exists! Try ${suggestedName}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Mobile Existence Check (simplified for MVP, ideally should be a query)
+      const fullNumber = normalizePhone(formData.mobile, selectedCountry);
+      
+      // 3. Create User in Firestore
+      const userId = Date.now().toString(); // In a real app, this would be the Auth UID
+      const newUser = {
+        id: userId,
+        name: username,
+        mobile: fullNumber,
+        balance: 0.00,
+        points: 0,
+        xp: 0,
+        isPlayer: true,
+        isAdmin: false,
+        createdAt: new Date().toISOString(),
+        adsWatched: 0
+      };
+
+      // Atomic write: User document + Username registry
+      const batch = writeBatch(firestore);
+      const userRef = doc(firestore, 'users', userId);
+      batch.set(userRef, newUser);
+      batch.set(usernameRef, { userId: userId });
+      
+      await batch.commit();
+
+      localStorage.setItem('glowearn_current_user', JSON.stringify(newUser));
+      toast({
+        title: "Account Created!",
+        description: "Welcome to the GlowEarn community.",
+      });
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || "Signup failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const newUser = {
-      id: Date.now().toString(),
-      name: formData.name,
-      mobile: fullNumber,
-      balance: 0.00,
-      points: 0,
-      xp: 0,
-      isPlayer: true,
-      isAdmin: false,
-      createdAt: new Date().toISOString()
-    };
-
-    users.push(newUser);
-    localStorage.setItem('glowearn_users', JSON.stringify(users));
-    localStorage.setItem('glowearn_current_user', JSON.stringify(newUser));
-
-    toast({
-      title: "Account Created!",
-      description: "Welcome to the GlowEarn community.",
-    });
-    
-    router.push('/');
   };
 
   return (
@@ -152,7 +176,7 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSignUp} className="space-y-6">
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3">
+            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
               <AlertCircle className="text-red-500 shrink-0" size={18} />
               <p className="text-red-500 text-xs font-bold uppercase tracking-tight">{error}</p>
             </div>
@@ -162,10 +186,13 @@ export default function SignUpPage() {
             <div className="space-y-6 animate-in fade-in">
               <GoldenInput 
                 icon={User} 
-                label="Full Name" 
-                placeholder="John Doe" 
+                label="Full Name (Username)" 
+                placeholder="Ahmad" 
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => {
+                  setFormData({...formData, name: e.target.value});
+                  setError('');
+                }}
                 required 
               />
               <div className="space-y-2">
@@ -245,10 +272,16 @@ export default function SignUpPage() {
           <div className="pt-4">
             <GoldenButton 
               type="submit" 
-              disabled={!isDevMode && formData.mobile.length > 0 && !isPhoneValid}
-              className={!isDevMode && formData.mobile.length > 0 && !isPhoneValid ? "opacity-50 grayscale" : ""}
+              disabled={isSubmitting || (!isDevMode && formData.mobile.length > 0 && !isPhoneValid)}
+              className={(!isDevMode && formData.mobile.length > 0 && !isPhoneValid) ? "opacity-50 grayscale" : ""}
             >
-              {isDevMode ? 'Authorize Dev Account' : 'Sign Up Now'}
+              {isSubmitting ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : isDevMode ? (
+                'Authorize Dev Account'
+              ) : (
+                'Sign Up Now'
+              )}
             </GoldenButton>
           </div>
         </form>
@@ -280,3 +313,4 @@ export default function SignUpPage() {
     </div>
   );
 }
+
