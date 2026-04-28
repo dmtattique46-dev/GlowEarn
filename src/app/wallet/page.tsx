@@ -17,8 +17,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc, increment } from 'firebase/firestore';
+import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { doc, increment, collection, serverTimestamp } from 'firebase/firestore';
 
 const BinanceLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_15px_rgba(243,186,47,0.3)]">
@@ -131,19 +131,36 @@ export default function WalletPage() {
   };
 
   const handleSubmitRequest = () => {
-    if (!withdrawalDetail || !userRef) return;
+    if (!withdrawalDetail || !userRef || !firestore || !sessionUser) return;
+    
     playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('processing');
     
+    // 1. Create the Withdrawal Request in Firestore
+    const withdrawRequestsRef = collection(firestore, 'WithdrawRequests');
+    const requestData = {
+      userId: sessionUser.id,
+      username: userData?.name || sessionUser.name,
+      amountCoins: rawInputCoins,
+      amountUSD: Number(usdValue),
+      netPayout: Number(usdValue) * 0.95,
+      method: selectedMethod,
+      details: withdrawalDetail,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    };
+
+    addDocumentNonBlocking(withdrawRequestsRef, requestData);
+
+    // 2. Deduct coins from user balance
+    if (!isAdmin) {
+      updateDocumentNonBlocking(userRef, { 
+        coins: increment(-rawInputCoins),
+        usd: increment(Number(usdValue) * 0.95) 
+      });
+    }
+
     setTimeout(() => {
-      // Deduct coins in Firestore
-      if (!isAdmin) {
-        updateDocumentNonBlocking(userRef, { 
-          coins: increment(-rawInputCoins),
-          usd: increment(Number(usdValue) * 0.95) // Add net payout to internal USD balance (optional tracking)
-        });
-      }
-      
       playSfx('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
       setStep('success');
     }, 2500);
