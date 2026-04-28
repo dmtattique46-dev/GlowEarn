@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
@@ -58,6 +58,8 @@ export default function WalletPage() {
   const [adsWatched, setAdsWatched] = useState<number>(0);
 
   const AD_THRESHOLD = 1500;
+  // Conversion Rate: 1000 Coins = $0.10 USD
+  const COIN_CONVERSION_RATE = 10000; // Total coins for $1.00 USD (since 1000 = $0.10)
 
   useEffect(() => {
     const session = localStorage.getItem('glowearn_current_user');
@@ -65,16 +67,24 @@ export default function WalletPage() {
       const userData = JSON.parse(session);
       setUser(userData);
       
-      // Load ads watched from local storage
       const savedAds = localStorage.getItem(`ads_watched_${userData.id}`) || '0';
       setAdsWatched(parseInt(savedAds, 10));
     }
   }, []);
 
+  const playSfx = (url: string) => {
+    try {
+      const audio = new Audio(url);
+      audio.play().catch(e => console.log('Audio play blocked:', e));
+    } catch (e) {
+      console.error('Audio initialization error:', e);
+    }
+  };
+
   const withdrawalMethods = [
-    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 85000, inputLabel: "Enter JazzCash Mobile Number", placeholder: "+92 3XX XXXXXXX" },
-    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, rate: 60000, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" },
-    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, rate: 150000, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email" },
+    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 1000, inputLabel: "Enter JazzCash Mobile Number", placeholder: "+92 3XX XXXXXXX" },
+    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, rate: 1000, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" },
+    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, rate: 1000, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email" },
   ];
 
   const activeMethod = useMemo(() => 
@@ -82,15 +92,16 @@ export default function WalletPage() {
   , [selectedMethod]);
 
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
-  const usdValue = (rawInputCoins / activeMethod.rate).toFixed(2);
+  // Math: (coins / 1000) * 0.10
+  const usdValue = ((rawInputCoins / 1000) * 0.10).toFixed(2);
   
   const actualBalance = user?.points || 0;
   const isVerified = user?.emailVerified && user?.phoneVerified;
-  const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
-  const isWithinBalance = rawInputCoins <= actualBalance;
   const isAdsMet = adsWatched >= AD_THRESHOLD;
+  const hasEnoughCoins = rawInputCoins <= actualBalance;
+  const hasMinCoins = rawInputCoins >= 1000;
   
-  const canWithdraw = (user?.isAdmin) || (hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified && isAdsMet);
+  const canWithdraw = (user?.isAdmin) || (isAdsMet && isVerified && hasEnoughCoins && hasMinCoins);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -98,6 +109,7 @@ export default function WalletPage() {
   };
 
   const handleVerify = () => {
+    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     const verifiedUser = { ...user, emailVerified: true, phoneVerified: true };
     setUser(verifiedUser);
     localStorage.setItem('glowearn_current_user', JSON.stringify(verifiedUser));
@@ -111,15 +123,22 @@ export default function WalletPage() {
   };
 
   const handleSimulateAd = () => {
-    const newVal = adsWatched + 50; // Add 50 for faster testing
+    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+    const newVal = adsWatched + 50;
     setAdsWatched(newVal);
     if (user) {
       localStorage.setItem(`ads_watched_${user.id}`, newVal.toString());
     }
   };
 
+  const handleProceedToDetails = () => {
+    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+    setStep('details');
+  };
+
   const handleSubmitRequest = () => {
     if (!withdrawalDetail) return;
+    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('processing');
     
     setTimeout(() => {
@@ -135,6 +154,7 @@ export default function WalletPage() {
         localStorage.setItem('glowearn_users', JSON.stringify(users));
       }
       
+      playSfx('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
       setStep('success');
     }, 2500);
   };
@@ -151,7 +171,7 @@ export default function WalletPage() {
     <div className="relative min-h-screen pb-24 pt-20 bg-glowearn-navy">
       <FloatingElements />
       <Header 
-        usdBalance={user.isAdmin ? user.balance : actualBalance / activeMethod.rate} 
+        usdBalance={user.isAdmin ? user.balance : actualBalance / 10000} 
         coinCount={actualBalance} 
         xp={user.xp || 0}
         isAdmin={user.isAdmin}
@@ -165,13 +185,23 @@ export default function WalletPage() {
               <div className="space-y-0.5">
                 <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
                 <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-                  USD VALUE: <span className="italic">${(actualBalance / activeMethod.rate).toFixed(2)}</span>
+                  USD VALUE: <span className="italic">${((actualBalance / 1000) * 0.10).toFixed(2)}</span>
                 </h1>
               </div>
             </section>
 
+            {user.isAdmin && (
+              <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3 animate-in slide-in-from-top-4">
+                <ShieldCheck className="text-glowearn-gold shrink-0" size={24} />
+                <div className="flex-1">
+                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Testing Mode Active</p>
+                  <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase leading-tight">Bypassing all verification and balance limits.</p>
+                </div>
+              </div>
+            )}
+
             {!isVerified && !user.isAdmin && (
-              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3 animate-pulse">
+              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3">
                 <ShieldAlert className="text-red-500 shrink-0" size={24} />
                 <div className="flex-1">
                   <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Account Not Verified</p>
@@ -186,19 +216,9 @@ export default function WalletPage() {
               </div>
             )}
 
-            {user.isAdmin && (
-              <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3">
-                <ShieldCheck className="text-glowearn-gold shrink-0" size={24} />
-                <div className="flex-1">
-                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Testing Mode Active</p>
-                  <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase leading-tight">Bypassing all verification and balance limits.</p>
-                </div>
-              </div>
-            )}
-
             {/* Ad Progress Bar Logic */}
             {!user.isAdmin && (
-              <Card className="w-full bg-black/40 border border-glowearn-gold/20 rounded-3xl overflow-hidden p-5">
+              <Card className="w-full bg-[#0c2436]/40 border border-glowearn-gold/20 rounded-3xl overflow-hidden p-5 shadow-2xl">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                     <span className="text-white/60 flex items-center gap-2">
@@ -208,12 +228,14 @@ export default function WalletPage() {
                       {adsWatched} / {AD_THRESHOLD}
                     </span>
                   </div>
-                  <Progress value={(adsWatched / AD_THRESHOLD) * 100} className="h-2 bg-white/5 [&>div]:bg-glowearn-gold" />
-                  <p className="text-[9px] text-white/40 font-bold uppercase italic text-center">
+                  <Progress 
+                    value={(adsWatched / AD_THRESHOLD) * 100} 
+                    className="h-2.5 bg-black/40 [&>div]:bg-gradient-to-r [&>div]:from-glowearn-gold [&>div]:to-yellow-600" 
+                  />
+                  <p className="text-[9px] text-white/40 font-bold uppercase italic text-center leading-relaxed">
                     {isAdsMet ? "✓ Verified Activity - Conversion Unlocked" : "Unlock conversion by watching 1500 ads to verify your activity."}
                   </p>
                   
-                  {/* Temporary Simulation Button */}
                   <button 
                     onClick={handleSimulateAd}
                     className="w-full py-2 bg-white/5 border border-white/10 rounded-xl text-white/40 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors"
@@ -225,15 +247,15 @@ export default function WalletPage() {
             )}
 
             <Card className={cn(
-              "w-full bg-[#0c2436]/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500",
-              canWithdraw ? "neon-gold-border" : "border-white/10"
+              "w-full bg-black/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500 border-2",
+              canWithdraw ? "border-glowearn-gold shadow-[0_0_40px_rgba(250,219,59,0.2)]" : "border-white/10"
             )}>
               <CardContent className="p-8 space-y-6">
-                <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-xs">Coin to USD Converter</h3>
+                <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-[11px]">Coin to USD Converter</h3>
                 
                 <div className="space-y-2">
-                  <div className="relative flex items-center gap-4 bg-black/40 p-4 rounded-2xl border border-white/5">
-                    <div className="bg-glowearn-gold/10 p-1.5 rounded-full flex items-center justify-center">
+                  <div className="relative flex items-center gap-4 bg-[#081926] p-5 rounded-2xl border border-glowearn-gold/30 golden-glow">
+                    <div className="bg-glowearn-gold/10 p-1.5 rounded-full flex items-center justify-center shrink-0">
                       <activeMethod.Logo />
                     </div>
                     <div className="flex-1">
@@ -241,18 +263,26 @@ export default function WalletPage() {
                         type="text" 
                         value={coinsInput}
                         onChange={handleCoinChange}
-                        className="bg-transparent text-white font-black text-2xl w-full focus:outline-none placeholder:text-white/20"
+                        className="bg-transparent text-white font-black text-3xl w-full focus:outline-none placeholder:text-white/20 text-center"
                         placeholder="0"
                       />
-                      <span className="text-[10px] text-white/40 font-bold uppercase block -mt-1">Coins Amount</span>
+                      <span className="text-[10px] text-white/40 font-bold uppercase block text-center mt-1">Coins Amount</span>
                     </div>
                   </div>
 
-                  {rawInputCoins > 0 && !hasMinimumRequired && !user.isAdmin && (
-                    <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1">
+                  {rawInputCoins > 0 && !hasEnoughCoins && !user.isAdmin && (
+                    <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1 justify-center">
                       <AlertCircle size={12} />
                       <span className="text-[10px] font-bold uppercase tracking-tight">
-                        Minimum {activeMethod.rate.toLocaleString()} coins required
+                        Insufficient Coins Balance
+                      </span>
+                    </div>
+                  )}
+                  {rawInputCoins > 0 && !hasMinCoins && !user.isAdmin && (
+                    <div className="flex items-center gap-2 px-2 text-red-400 animate-in fade-in slide-in-from-top-1 justify-center">
+                      <Info size={12} />
+                      <span className="text-[10px] font-bold uppercase tracking-tight">
+                        Minimum 1,000 coins required
                       </span>
                     </div>
                   )}
@@ -262,13 +292,13 @@ export default function WalletPage() {
                   <ArrowRight className="text-glowearn-gold opacity-40 rotate-90 mb-4" size={32} />
                   
                   <div className={cn(
-                    "px-8 py-4 rounded-3xl border flex flex-col items-center transition-all duration-300 w-full text-center relative overflow-hidden",
+                    "px-8 py-5 rounded-[2rem] border flex flex-col items-center transition-all duration-300 w-full text-center relative overflow-hidden",
                     canWithdraw 
                       ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
                       : "bg-white/5 border-white/10"
                   )}>
                     <span className={cn(
-                      "font-black text-3xl italic tracking-tighter block",
+                      "font-headline font-black text-3xl italic tracking-tighter block",
                       canWithdraw ? "text-glowearn-gold" : "text-white/40"
                     )}>
                       ${usdValue} USD
@@ -276,8 +306,8 @@ export default function WalletPage() {
                     <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Est. Withdrawal Value</span>
                     
                     {canWithdraw && (
-                      <div className="absolute top-1 right-2">
-                        <CheckCircle2 size={16} className="text-glowearn-gold" />
+                      <div className="absolute top-2 right-4">
+                        <CheckCircle2 size={20} className="text-glowearn-gold animate-bounce" />
                       </div>
                     )}
                   </div>
@@ -315,26 +345,6 @@ export default function WalletPage() {
                           </p>
                         </div>
                       </div>
-
-                      <div className="flex items-start gap-3 p-3 bg-white/5 rounded-2xl border border-white/5">
-                        <DollarSign className="text-green-500 shrink-0 mt-1" size={16} />
-                        <div>
-                          <p className="text-white text-[10px] font-black uppercase tracking-tight">Fair Play Tax</p>
-                          <p className="text-white/60 text-[9px] font-bold uppercase mt-1 leading-relaxed">
-                            App maintenance ke liye har withdrawal par <span className="text-green-500">5% processing fee</span> kategi.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 p-3 bg-red-500/10 rounded-2xl border border-red-500/20">
-                        <Users className="text-red-500 shrink-0 mt-1" size={16} />
-                        <div>
-                          <p className="text-red-500 text-[10px] font-black uppercase tracking-tight">Permanent Ban Clause</p>
-                          <p className="text-white/70 text-[9px] font-bold uppercase mt-1 leading-relaxed">
-                            Multiple accounts bana kar ek hi wallet mein withdraw lene par <span className="text-red-500">Permanent Ban</span> hoga.
-                          </p>
-                        </div>
-                      </div>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -343,11 +353,11 @@ export default function WalletPage() {
 
             <button 
               disabled={!canWithdraw}
-              onClick={() => setStep('details')}
+              onClick={handleProceedToDetails}
               className={cn(
-                "w-full mt-2 rounded-2xl py-5 px-6 flex items-center justify-center gap-3 transition-all duration-300",
+                "w-full mt-2 rounded-[2rem] py-6 px-6 flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl",
                 canWithdraw 
-                  ? "shimmer-btn shadow-[0_10px_30px_rgba(250,219,59,0.3)] active:scale-95" 
+                  ? "shimmer-btn shadow-[0_15px_40px_rgba(250,219,59,0.3)] active:scale-95" 
                   : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
               )}
             >
@@ -355,7 +365,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                {canWithdraw && user.isAdmin ? 'Test Confirm' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} Ads Left` : (isVerified ? 'Confirm Withdrawal' : 'Verification Required'))}
+                {canWithdraw && user.isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : (isVerified ? 'CONFIRM WITHDRAWAL' : 'VERIFICATION REQUIRED'))}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />
@@ -369,7 +379,10 @@ export default function WalletPage() {
         {step === 'details' && (
           <div className="w-full space-y-8 mt-4 animate-in slide-in-from-right duration-300">
             <button 
-              onClick={() => setStep('selection')}
+              onClick={() => {
+                playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+                setStep('selection');
+              }}
               className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
             >
               <ChevronLeft size={16} /> Back to Vault
@@ -462,7 +475,10 @@ export default function WalletPage() {
               </p>
             </div>
             <button 
-              onClick={handleReset} 
+              onClick={() => {
+                playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+                handleReset();
+              }} 
               className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-[10px] hover:underline hover:scale-110 transition-transform"
             >
               Return to Wallet
@@ -475,4 +491,3 @@ export default function WalletPage() {
     </div>
   );
 }
-
