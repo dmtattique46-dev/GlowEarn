@@ -18,6 +18,8 @@ import { Progress } from "@/components/ui/progress";
 const ROWS = 8;
 const COLS = 8;
 const OFFSET_Y = 80;
+const SESSION_COIN_LIMIT = 200;
+const COINS_PER_LINE = 20;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
 type GameState = 'menu' | 'puzzle' | 'quick-solve' | 'watch-boost';
@@ -37,10 +39,12 @@ export default function EarnPage() {
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [grid, setGrid] = useState<BlockType[][]>(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
+  const [sessionCoins, setSessionCoins] = useState(0);
   const [shelf, setShelf] = useState<(any | null)[]>([]);
   const [showLineClear, setShowLineClear] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [showCoinsAnim, setShowCoinsAnim] = useState(false);
+  const [rewardPopup, setRewardPopup] = useState<{ show: boolean, text: string }>({ show: false, text: '' });
   
   // Quick Solve State
   const [targetCode, setTargetCode] = useState<string>('');
@@ -182,6 +186,7 @@ export default function EarnPage() {
   const resetGame = () => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
     setScore(0);
+    setSessionCoins(0);
     setIsGameOver(false);
     refillShelf();
   };
@@ -312,13 +317,25 @@ export default function EarnPage() {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
         colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        const coinReward = totalLines * 100;
-        setScore(prev => prev + coinReward);
-        syncCoinsToFirestore(coinReward);
+        // Reward Logic
+        const potentialReward = totalLines * COINS_PER_LINE;
+        const actualReward = (sessionCoins + potentialReward > SESSION_COIN_LIMIT) 
+          ? Math.max(0, SESSION_COIN_LIMIT - sessionCoins) 
+          : potentialReward;
+
+        if (actualReward > 0) {
+          setSessionCoins(prev => prev + actualReward);
+          setScore(prev => prev + actualReward);
+          syncCoinsToFirestore(actualReward);
+          
+          setRewardPopup({ show: true, text: `+${actualReward}` });
+          setTimeout(() => setRewardPopup(prev => ({ ...prev, show: false })), 1000);
+          setShowCoinsAnim(true);
+          setTimeout(() => setShowCoinsAnim(false), 1500);
+        }
         
         setShowLineClear(true);
-        setShowCoinsAnim(true);
-        setTimeout(() => { setShowLineClear(false); setShowCoinsAnim(false); }, 1500);
+        setTimeout(() => setShowLineClear(false), 1500);
         triggerHaptic([100, 50, 100]);
       }
 
@@ -334,7 +351,7 @@ export default function EarnPage() {
     }
 
     setDragState({ index: null, pos: { x: 0, y: 0 }, ghost: null });
-  }, [dragState, shelf, grid, syncCoinsToFirestore, checkGameOver]);
+  }, [dragState, shelf, grid, sessionCoins, syncCoinsToFirestore, checkGameOver]);
 
   useEffect(() => {
     if (dragState.index !== null) {
@@ -385,7 +402,7 @@ export default function EarnPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
                   <div className="absolute bottom-4 left-6">
                     <h2 className="text-white font-headline font-black text-xl uppercase italic">Glow Block Puzzle</h2>
-                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">High Rewards</p>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">20 Coins per line • Limit 200</p>
                   </div>
                 </div>
               </Card>
@@ -580,16 +597,23 @@ export default function EarnPage() {
               >
                 <ChevronLeft size={16} /> Back to Menu
               </button>
-              <div className="flex items-center gap-2 bg-glowearn-gold/10 px-4 py-2 rounded-full border border-glowearn-gold/20">
-                <span className="text-glowearn-gold font-black italic text-sm">{score.toLocaleString()}</span>
-                <span className="text-glowearn-gold/60 font-bold uppercase text-[9px] tracking-widest">Session</span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2 bg-glowearn-gold/10 px-4 py-1.5 rounded-full border border-glowearn-gold/20">
+                  <span className="text-glowearn-gold font-black italic text-sm">{sessionCoins} / {SESSION_COIN_LIMIT}</span>
+                  <span className="text-glowearn-gold/60 font-bold uppercase text-[9px] tracking-widest">Session</span>
+                </div>
               </div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center relative">
               <h1 className="text-glowearn-gold font-headline text-3xl font-black italic tracking-[0.15em] uppercase">
                 GLOW PUZZLE
               </h1>
+              {rewardPopup.show && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-glowearn-gold font-black text-2xl animate-out fade-out slide-out-to-top-8 duration-1000">
+                  {rewardPopup.text}
+                </div>
+              )}
             </div>
 
             <div 
@@ -635,6 +659,9 @@ export default function EarnPage() {
                 <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center bg-glowearn-navy/90 backdrop-blur-xl rounded-[1.5rem] animate-in fade-in duration-500">
                   <Trophy className="text-glowearn-gold w-16 h-16 animate-pulse mb-4" />
                   <h2 className="text-glowearn-gold font-headline text-4xl font-black italic uppercase mb-2">GAME OVER</h2>
+                  <div className="bg-glowearn-gold/20 px-6 py-2 rounded-full mb-6 border border-glowearn-gold/30">
+                    <span className="text-glowearn-gold font-black">Earned: {sessionCoins} Coins</span>
+                  </div>
                   <button 
                     onClick={resetGame}
                     className="shimmer-btn py-4 px-8 rounded-2xl text-glowearn-navy font-black text-lg uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform"
