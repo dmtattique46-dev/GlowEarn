@@ -6,10 +6,11 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
+import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
   AccordionContent,
@@ -54,11 +55,19 @@ export default function WalletPage() {
   const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
   const [step, setStep] = useState<Step>('selection');
   const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
+  const [adsWatched, setAdsWatched] = useState<number>(0);
+
+  const AD_THRESHOLD = 1500;
 
   useEffect(() => {
     const session = localStorage.getItem('glowearn_current_user');
     if (session) {
-      setUser(JSON.parse(session));
+      const userData = JSON.parse(session);
+      setUser(userData);
+      
+      // Load ads watched from local storage
+      const savedAds = localStorage.getItem(`ads_watched_${userData.id}`) || '0';
+      setAdsWatched(parseInt(savedAds, 10));
     }
   }, []);
 
@@ -79,8 +88,9 @@ export default function WalletPage() {
   const isVerified = user?.emailVerified && user?.phoneVerified;
   const hasMinimumRequired = rawInputCoins >= activeMethod.rate;
   const isWithinBalance = rawInputCoins <= actualBalance;
+  const isAdsMet = adsWatched >= AD_THRESHOLD;
   
-  const canWithdraw = (user?.isAdmin) || (hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified);
+  const canWithdraw = (user?.isAdmin) || (hasMinimumRequired && isWithinBalance && rawInputCoins > 0 && isVerified && isAdsMet);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
@@ -97,6 +107,14 @@ export default function WalletPage() {
     if (index !== -1) {
       users[index] = verifiedUser;
       localStorage.setItem('glowearn_users', JSON.stringify(users));
+    }
+  };
+
+  const handleSimulateAd = () => {
+    const newVal = adsWatched + 50; // Add 50 for faster testing
+    setAdsWatched(newVal);
+    if (user) {
+      localStorage.setItem(`ads_watched_${user.id}`, newVal.toString());
     }
   };
 
@@ -176,6 +194,34 @@ export default function WalletPage() {
                   <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase leading-tight">Bypassing all verification and balance limits.</p>
                 </div>
               </div>
+            )}
+
+            {/* Ad Progress Bar Logic */}
+            {!user.isAdmin && (
+              <Card className="w-full bg-black/40 border border-glowearn-gold/20 rounded-3xl overflow-hidden p-5">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <PlayCircle size={14} className="text-glowearn-gold" /> Ads Watched
+                    </span>
+                    <span className={cn(isAdsMet ? "text-green-400" : "text-glowearn-gold")}>
+                      {adsWatched} / {AD_THRESHOLD}
+                    </span>
+                  </div>
+                  <Progress value={(adsWatched / AD_THRESHOLD) * 100} className="h-2 bg-white/5 [&>div]:bg-glowearn-gold" />
+                  <p className="text-[9px] text-white/40 font-bold uppercase italic text-center">
+                    {isAdsMet ? "✓ Verified Activity - Conversion Unlocked" : "Unlock conversion by watching 1500 ads to verify your activity."}
+                  </p>
+                  
+                  {/* Temporary Simulation Button */}
+                  <button 
+                    onClick={handleSimulateAd}
+                    className="w-full py-2 bg-white/5 border border-white/10 rounded-xl text-white/40 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                  >
+                    Watch Ad (Simulate +50)
+                  </button>
+                </div>
+              </Card>
             )}
 
             <Card className={cn(
@@ -309,7 +355,7 @@ export default function WalletPage() {
                 "font-headline font-black text-xl uppercase tracking-widest",
                 canWithdraw ? "text-glowearn-navy" : "text-white/40"
               )}>
-                {canWithdraw && user.isAdmin ? 'Test Confirm' : (isVerified ? 'Confirm Withdrawal' : 'Verification Required')}
+                {canWithdraw && user.isAdmin ? 'Test Confirm' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} Ads Left` : (isVerified ? 'Confirm Withdrawal' : 'Verification Required'))}
               </span>
               {!canWithdraw ? (
                 <Lock className="text-white/20" size={24} />
@@ -429,3 +475,4 @@ export default function WalletPage() {
     </div>
   );
 }
+
