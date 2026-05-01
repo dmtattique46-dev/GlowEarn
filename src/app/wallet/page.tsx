@@ -6,19 +6,15 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, Clock, ShieldAlert, Users, DollarSign, Info, PlayCircle } from 'lucide-react';
+import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, PlayCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
 import { Progress } from "@/components/ui/progress";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { doc, increment, collection, serverTimestamp } from 'firebase/firestore';
+
+// --- Payment Method Logos ---
 
 const BinanceLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-yellow-500/40 shadow-[0_0_15px_rgba(243,186,47,0.3)]">
@@ -41,6 +37,15 @@ const JazzCashLogo = () => (
   </div>
 );
 
+const EasyPaisaLogo = () => (
+  <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.3)] relative overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-green-600 to-green-400 opacity-40"></div>
+    <div className="relative flex items-center justify-center">
+      <span className="text-white font-black text-xl italic tracking-tighter drop-shadow-md">EP</span>
+    </div>
+  </div>
+);
+
 const BitcoinLogo = () => (
   <div className="w-14 h-14 rounded-full bg-black/90 flex items-center justify-center border border-orange-500/40 shadow-[0_0_15px_rgba(247,147,26,0.3)]">
     <svg viewBox="0 0 24 24" className="w-8 h-8 fill-[#F7931A]">
@@ -51,11 +56,20 @@ const BitcoinLogo = () => (
 
 type Step = 'selection' | 'details' | 'processing' | 'success';
 
+interface WithdrawalMethod {
+  name: string;
+  label: string;
+  Logo: React.FC;
+  inputLabel: string;
+  placeholder: string;
+  region: 'PK' | 'INT' | 'ALL';
+}
+
 export default function WalletPage() {
   const firestore = useFirestore();
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [coinsInput, setCoinsInput] = useState<string>("0");
-  const [selectedMethod, setSelectedMethod] = useState<string>("JazzCash");
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
   const [step, setStep] = useState<Step>('selection');
   const [withdrawalDetail, setWithdrawalDetail] = useState<string>('');
 
@@ -76,37 +90,41 @@ export default function WalletPage() {
 
   const { data: userData } = useDoc(userRef);
 
-  const actualBalance = userData?.coins ?? 0;
-  const adsWatched = userData?.adsWatched ?? 0;
-  const isAdmin = userData?.isAdmin ?? false;
-  const isVerified = userData?.emailVerified && userData?.phoneVerified;
+  const isAdmin = userData?.isAdmin || userData?.email === 'developerge@gmail.com' || sessionUser?.isAdmin;
+  const isPakistan = userData?.mobile?.startsWith('+92');
 
-  const playSfx = (url: string) => {
-    try {
-      const audio = new Audio(url);
-      audio.play().catch(e => console.log('Audio play blocked:', e));
-    } catch (e) {
-      console.error('Audio initialization error:', e);
-    }
-  };
-
-  const withdrawalMethods = [
-    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, rate: 1000, inputLabel: "Enter JazzCash Mobile Number", placeholder: "+92 3XX XXXXXXX" },
-    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, rate: 1000, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" },
-    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, rate: 1000, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email" },
+  const withdrawalMethods: WithdrawalMethod[] = [
+    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, inputLabel: "Enter JazzCash Mobile Number", placeholder: "03XX XXXXXXX", region: 'PK' },
+    { name: "EasyPaisa", label: "(Mobile Wallet)", Logo: EasyPaisaLogo, inputLabel: "Enter EasyPaisa Mobile Number", placeholder: "03XX XXXXXXX", region: 'PK' },
+    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", region: 'INT' },
+    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email", region: 'INT' },
   ];
+
+  const filteredMethods = useMemo(() => {
+    if (isAdmin) return withdrawalMethods;
+    return withdrawalMethods.filter(m => isPakistan ? m.region === 'PK' : m.region === 'INT');
+  }, [isAdmin, isPakistan]);
+
+  // Default selection
+  useEffect(() => {
+    if (filteredMethods.length > 0 && !selectedMethod) {
+      setSelectedMethod(filteredMethods[0].name);
+    }
+  }, [filteredMethods, selectedMethod]);
 
   const activeMethod = useMemo(() => 
     withdrawalMethods.find(m => m.name === selectedMethod) || withdrawalMethods[0]
   , [selectedMethod]);
 
+  const actualBalance = userData?.coins ?? 0;
+  const adsWatched = userData?.adsWatched ?? 0;
+  
   const rawInputCoins = Number(coinsInput.replace(/,/g, ''));
   const usdValue = ((rawInputCoins / 1000) * CONVERSION_RATE).toFixed(2);
   
   const isAdsMet = adsWatched >= AD_THRESHOLD;
   const hasEnoughCoins = rawInputCoins <= actualBalance;
   const hasMinCoins = rawInputCoins >= 1000;
-  
   const canWithdraw = (isAdmin) || (isAdsMet && hasEnoughCoins && hasMinCoins);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,16 +132,9 @@ export default function WalletPage() {
     setCoinsInput(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   };
 
-  const handleVerify = () => {
-    if (!userRef) return;
-    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-    updateDocumentNonBlocking(userRef, { emailVerified: true, phoneVerified: true });
-  };
-
-  const handleSimulateAd = () => {
-    if (!userRef) return;
-    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-    updateDocumentNonBlocking(userRef, { adsWatched: increment(50) });
+  const playSfx = (url: string) => {
+    const audio = new Audio(url);
+    audio.play().catch(() => {});
   };
 
   const handleProceedToDetails = () => {
@@ -155,7 +166,7 @@ export default function WalletPage() {
     if (!isAdmin) {
       updateDocumentNonBlocking(userRef, { 
         coins: increment(-rawInputCoins),
-        usd: increment(-(Number(usdValue))) // Deduct from the user's computed USD balance
+        usd: increment(-(Number(usdValue)))
       });
     }
 
@@ -163,12 +174,6 @@ export default function WalletPage() {
       playSfx('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
       setStep('success');
     }, 2500);
-  };
-
-  const handleReset = () => {
-    setStep('selection');
-    setWithdrawalDetail('');
-    setCoinsInput('0');
   };
 
   if (!sessionUser) return null;
@@ -182,47 +187,31 @@ export default function WalletPage() {
         {step === 'selection' && (
           <>
             <section className="w-full text-center space-y-1 mt-4">
-              <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Balance Summary</h3>
+              <h3 className="text-glowearn-gold/60 font-bold uppercase tracking-[0.2em] text-[10px]">Vault Balance</h3>
               <div className="space-y-0.5">
-                <h2 className="text-white/80 font-bold text-lg">AVAILABLE COINS: <span className="text-white font-black italic">{actualBalance.toLocaleString()}</span></h2>
-                <h1 className="text-glowearn-gold font-headline font-black text-2xl uppercase tracking-tighter">
-                  USD VALUE: <span className="italic">${((actualBalance / 1000) * CONVERSION_RATE).toFixed(2)}</span>
+                <h1 className="text-glowearn-gold font-headline font-black text-3xl uppercase tracking-tighter">
+                  USD: <span className="italic">${((actualBalance / 1000) * CONVERSION_RATE).toFixed(2)}</span>
                 </h1>
+                <p className="text-white/40 font-bold text-xs uppercase">{actualBalance.toLocaleString()} Coins Available</p>
               </div>
             </section>
 
             {isAdmin && (
-              <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3 animate-in slide-in-from-top-4">
+              <div className="w-full bg-glowearn-gold/10 border border-glowearn-gold/30 p-4 rounded-3xl flex items-center gap-3">
                 <ShieldCheck className="text-glowearn-gold shrink-0" size={24} />
                 <div className="flex-1">
-                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Testing Mode Active</p>
-                  <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase leading-tight">Bypassing all verification and balance limits.</p>
+                  <p className="text-white font-black text-[10px] uppercase tracking-tighter">Testing Mode Active</p>
+                  <p className="text-glowearn-gold/80 text-[9px] font-bold uppercase">All restrictions bypassed for Developer.</p>
                 </div>
-              </div>
-            )}
-
-            {!isVerified && !isAdmin && (
-              <div className="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-3xl flex items-center gap-3">
-                <ShieldAlert className="text-red-500 shrink-0" size={24} />
-                <div className="flex-1">
-                  <p className="text-white font-black text-[10px] uppercase tracking-tighter leading-none mb-1">Account Not Verified</p>
-                  <p className="text-red-400 text-[9px] font-bold uppercase leading-tight">Identity verification required to unlock withdrawal vault.</p>
-                </div>
-                <button 
-                  onClick={handleVerify}
-                  className="bg-red-600 text-white text-[9px] font-black px-4 py-2 rounded-xl uppercase shadow-lg active:scale-95 transition-all"
-                >
-                  Verify Now
-                </button>
               </div>
             )}
 
             {!isAdmin && (
-              <Card className="w-full bg-[#0c2436]/40 border border-glowearn-gold/20 rounded-3xl overflow-hidden p-5 shadow-2xl">
+              <Card className="w-full bg-[#0c2436]/40 border border-glowearn-gold/20 rounded-3xl p-5 shadow-2xl">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                     <span className="text-white/60 flex items-center gap-2">
-                      <PlayCircle size={14} className="text-glowearn-gold" /> Ads Watched
+                      <PlayCircle size={14} className="text-glowearn-gold" /> Verification Progress
                     </span>
                     <span className={cn(isAdsMet ? "text-green-400" : "text-glowearn-gold")}>
                       {adsWatched} / {AD_THRESHOLD}
@@ -230,113 +219,79 @@ export default function WalletPage() {
                   </div>
                   <Progress 
                     value={(adsWatched / AD_THRESHOLD) * 100} 
-                    className="h-2.5 bg-black/40 [&>div]:bg-gradient-to-r [&>div]:from-glowearn-gold [&>div]:to-yellow-600" 
+                    className="h-2.5 bg-black/40 [&>div]:bg-glowearn-gold" 
                   />
-                  <p className="text-[9px] text-white/40 font-bold uppercase italic text-center leading-relaxed">
-                    {isAdsMet ? "✓ Verified Activity - Conversion Unlocked" : `Unlock conversion by watching ${AD_THRESHOLD} ads to verify your activity.`}
+                  <p className="text-[9px] text-white/40 font-bold uppercase text-center italic">
+                    {isAdsMet ? "✓ Verification Complete" : "Watch 1500 ads to unlock conversion."}
                   </p>
-                  
-                  <button 
-                    onClick={handleSimulateAd}
-                    className="w-full py-2 bg-white/5 border border-white/10 rounded-xl text-white/40 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors"
-                  >
-                    Watch Ad (Simulate +50)
-                  </button>
                 </div>
               </Card>
             )}
 
+            <div className="w-full grid grid-cols-2 gap-3">
+              {filteredMethods.map((method) => (
+                <button
+                  key={method.name}
+                  onClick={() => setSelectedMethod(method.name)}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-4 rounded-3xl border-2 transition-all duration-300 backdrop-blur-md",
+                    selectedMethod === method.name 
+                      ? "bg-glowearn-gold/20 border-glowearn-gold shadow-[0_0_20px_rgba(250,219,59,0.2)]" 
+                      : "bg-white/5 border-white/10 hover:border-white/20"
+                  )}
+                >
+                  <method.Logo />
+                  <span className="mt-2 text-white font-black text-[10px] uppercase tracking-widest">{method.name}</span>
+                </button>
+              ))}
+            </div>
+
             <Card className={cn(
-              "w-full bg-black/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md transition-all duration-500 border-2",
-              canWithdraw ? "border-glowearn-gold shadow-[0_0_40px_rgba(250,219,59,0.2)]" : "border-white/10"
+              "w-full bg-black/60 rounded-[2.5rem] overflow-hidden backdrop-blur-md border-2 transition-all duration-500",
+              canWithdraw ? "border-glowearn-gold shadow-[0_0_40px_rgba(250,219,59,0.1)]" : "border-white/10"
             )}>
               <CardContent className="p-8 space-y-6">
-                <h3 className="text-glowearn-gold/80 font-bold text-center uppercase tracking-widest text-[11px]">Coin to USD Converter</h3>
-                
                 <div className="space-y-2">
-                  <div className="relative flex items-center gap-4 bg-[#081926] p-5 rounded-2xl border border-glowearn-gold/30 golden-glow">
-                    <div className="bg-glowearn-gold/10 p-1.5 rounded-full flex items-center justify-center shrink-0">
-                      <activeMethod.Logo />
-                    </div>
-                    <div className="flex-1">
-                      <input 
-                        type="text" 
-                        value={coinsInput}
-                        onChange={handleCoinChange}
-                        className="bg-transparent text-white font-black text-3xl w-full focus:outline-none placeholder:text-white/20 text-center"
-                        placeholder="0"
-                      />
-                      <span className="text-[10px] text-white/40 font-bold uppercase block text-center mt-1">Coins Amount</span>
-                    </div>
+                  <label className="text-glowearn-gold/60 font-bold uppercase tracking-widest text-[10px] px-1">Redeem Amount</label>
+                  <div className="relative flex items-center gap-4 bg-[#081926] p-5 rounded-2xl border border-white/5">
+                    <input 
+                      type="text" 
+                      value={coinsInput}
+                      onChange={handleCoinChange}
+                      className="bg-transparent text-white font-black text-3xl w-full focus:outline-none placeholder:text-white/20 text-center"
+                      placeholder="0"
+                    />
                   </div>
-
                   {rawInputCoins > 0 && !hasEnoughCoins && !isAdmin && (
-                    <div className="flex items-center gap-2 px-2 text-destructive animate-in fade-in slide-in-from-top-1 justify-center">
-                      <AlertCircle size={12} />
-                      <span className="text-[10px] font-bold uppercase tracking-tight">
-                        Insufficient Coins Balance
-                      </span>
-                    </div>
-                  )}
-                  {rawInputCoins > 0 && !hasMinCoins && !isAdmin && (
-                    <div className="flex items-center gap-2 px-2 text-red-400 animate-in fade-in slide-in-from-top-1 justify-center">
-                      <Info size={12} />
-                      <span className="text-[10px] font-bold uppercase tracking-tight">
-                        Minimum 1,000 coins required
-                      </span>
-                    </div>
+                    <p className="text-red-500 text-[10px] font-bold uppercase text-center">Insufficient Balance</p>
                   )}
                 </div>
 
                 <div className="flex flex-col items-center justify-center py-2 relative">
-                  <ArrowRight className="text-glowearn-gold opacity-40 rotate-90 mb-4" size={32} />
-                  
+                  <ArrowRight className="text-glowearn-gold/20 rotate-90 mb-4" size={24} />
                   <div className={cn(
-                    "px-8 py-5 rounded-[2rem] border flex flex-col items-center transition-all duration-300 w-full text-center relative overflow-hidden",
-                    canWithdraw 
-                      ? "bg-glowearn-gold/10 border-glowearn-gold golden-glow" 
-                      : "bg-white/5 border-white/10"
+                    "px-8 py-5 rounded-[2rem] border flex flex-col items-center w-full text-center relative",
+                    canWithdraw ? "bg-glowearn-gold/10 border-glowearn-gold/30" : "bg-white/5 border-white/5"
                   )}>
                     <span className={cn(
-                      "font-headline font-black text-3xl italic tracking-tighter block",
-                      canWithdraw ? "text-glowearn-gold" : "text-white/40"
+                      "font-headline font-black text-2xl italic tracking-tighter block",
+                      canWithdraw ? "text-glowearn-gold" : "text-white/20"
                     )}>
                       ${usdValue} USD
                     </span>
-                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Est. Withdrawal Value</span>
-                    
-                    {canWithdraw && (
-                      <div className="absolute top-2 right-4">
-                        <CheckCircle2 size={20} className="text-glowearn-gold animate-bounce" />
-                      </div>
-                    )}
+                    <span className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1">Est. Payout Value</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <button 
-              disabled={!canWithdraw}
+            <GoldenButton 
+              disabled={!canWithdraw || rawInputCoins < 1000}
               onClick={handleProceedToDetails}
-              className={cn(
-                "w-full mt-2 rounded-[2rem] py-6 px-6 flex items-center justify-center gap-3 transition-all duration-300 shadow-2xl",
-                canWithdraw 
-                  ? "shimmer-btn shadow-[0_15px_40px_rgba(250,219,59,0.3)] active:scale-95" 
-                  : "bg-white/5 border border-white/10 opacity-30 cursor-not-allowed"
-              )}
+              className={!canWithdraw || rawInputCoins < 1000 ? "opacity-30 grayscale" : ""}
             >
-              <span className={cn(
-                "font-headline font-black text-xl uppercase tracking-widest",
-                canWithdraw ? "text-glowearn-navy" : "text-white/40"
-              )}>
-                {canWithdraw && isAdmin ? 'TEST CONFIRM' : (!isAdsMet ? `${AD_THRESHOLD - adsWatched} ADS LEFT` : 'CONFIRM WITHDRAWAL')}
-              </span>
-              {!canWithdraw ? (
-                <Lock className="text-white/20" size={24} />
-              ) : (
-                <Unlock className="text-glowearn-navy" size={24} />
-              )}
-            </button>
+              {isAdmin ? 'TEST CONVERT' : (rawInputCoins < 1000 ? 'MIN 1000 COINS' : 'PROCEED TO DETAILS')}
+            </GoldenButton>
           </>
         )}
 
@@ -344,42 +299,40 @@ export default function WalletPage() {
           <div className="w-full space-y-8 mt-4 animate-in slide-in-from-right duration-300">
             <button 
               onClick={() => setStep('selection')}
-              className="flex items-center gap-2 text-glowearn-gold/60 hover:text-glowearn-gold font-bold uppercase text-xs"
+              className="flex items-center gap-2 text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest"
             >
-              <ChevronLeft size={16} /> Back to Vault
+              <ChevronLeft size={16} /> Change Method
             </button>
 
-            <header className="text-center space-y-2">
-              <h1 className="text-white font-headline text-3xl font-black uppercase tracking-tight">Final <span className="text-glowearn-gold">Review</span></h1>
-              <p className="text-white/40 text-sm">Review your payout and fee deductions</p>
+            <header className="text-center">
+              <h1 className="text-white font-headline text-3xl font-black uppercase italic tracking-tighter">Confirm <span className="text-glowearn-gold">Payout</span></h1>
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-1">Final review of your request</p>
             </header>
 
-            <Card className="bg-glowearn-gold/10 border-glowearn-gold/40 rounded-3xl overflow-hidden backdrop-blur-md">
+            <Card className="bg-[#0c2436]/80 border-2 border-glowearn-gold/30 rounded-[2.5rem] overflow-hidden backdrop-blur-xl">
               <CardContent className="p-8 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="bg-glowearn-navy border border-glowearn-gold/20 p-2.5 rounded-2xl shadow-lg">
-                      <activeMethod.Logo />
-                    </div>
+                    <activeMethod.Logo />
                     <div>
                       <h4 className="text-white font-black text-sm uppercase tracking-tight">{activeMethod.name}</h4>
-                      <p className="text-white/40 text-[9px] uppercase font-bold">{rawInputCoins.toLocaleString()} Coins Redeemed</p>
+                      <p className="text-glowearn-gold font-bold text-[9px] uppercase tracking-widest">{activeMethod.label}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="block text-glowearn-gold font-black text-2xl italic">${usdValue}</span>
-                    <span className="text-white/40 text-[8px] font-black uppercase tracking-widest">Gross Total</span>
+                    <span className="block text-white font-black text-xl italic">${usdValue}</span>
+                    <span className="text-white/40 text-[8px] font-bold uppercase">Amount</span>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-glowearn-gold/10 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/60 font-bold text-[10px] uppercase tracking-wider">Maintenance Fee (5%)</span>
-                    <span className="text-red-400 font-black text-xs">-${(Number(usdValue) * 0.05).toFixed(2)}</span>
+                <div className="pt-4 border-t border-white/5 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                    <span className="text-white/40">Fee (5%)</span>
+                    <span className="text-red-400">-${(Number(usdValue) * 0.05).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-glowearn-gold/5 rounded-xl border border-glowearn-gold/10">
+                  <div className="flex justify-between items-center p-4 bg-glowearn-gold/10 rounded-2xl border border-glowearn-gold/20">
                     <span className="text-glowearn-gold font-black text-xs uppercase tracking-widest">Net Payout</span>
-                    <span className="text-white font-black text-xl italic">${(Number(usdValue) * 0.95).toFixed(2)}</span>
+                    <span className="text-white font-black text-2xl italic">${(Number(usdValue) * 0.95).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -394,39 +347,45 @@ export default function WalletPage() {
                 onChange={(e) => setWithdrawalDetail(e.target.value)}
                 required
               />
-              <div className="pt-4">
-                <GoldenButton 
-                  onClick={handleSubmitRequest}
-                  disabled={!withdrawalDetail}
-                >
-                  Confirm & Transfer
-                </GoldenButton>
-              </div>
+              <GoldenButton 
+                onClick={handleSubmitRequest}
+                disabled={!withdrawalDetail}
+                className={!withdrawalDetail ? "opacity-50" : ""}
+              >
+                REQUEST WITHDRAWAL
+              </GoldenButton>
             </div>
           </div>
         )}
 
         {step === 'processing' && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in duration-500">
-            <Loader2 className="text-glowearn-gold animate-spin" size={100} strokeWidth={1} />
-            <h2 className="text-white font-headline text-3xl font-black uppercase tracking-widest">Securing Funds...</h2>
+          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 text-center animate-in fade-in">
+            <Loader2 className="text-glowearn-gold animate-spin" size={80} strokeWidth={1} />
+            <h2 className="text-white font-headline text-2xl font-black uppercase tracking-widest">Validating Chain...</h2>
           </div>
         )}
 
         {step === 'success' && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in duration-500 px-4">
-            <CheckCircle2 className="text-glowearn-gold" size={100} strokeWidth={1} />
+          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 text-center animate-in zoom-in px-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-glowearn-gold blur-2xl opacity-20 animate-pulse"></div>
+              <CheckCircle2 className="text-glowearn-gold relative z-10" size={100} strokeWidth={1} />
+            </div>
             <div className="space-y-2">
-              <h2 className="text-white font-headline text-4xl font-black uppercase tracking-tighter">Request <span className="text-glowearn-gold">Queued!</span></h2>
-              <p className="text-white/70 font-bold text-sm leading-relaxed max-w-[280px] mx-auto">
-                Your manual review has started. Expected arrival: <span className="text-glowearn-gold">24-72 hours</span>.
+              <h2 className="text-white font-headline text-3xl font-black uppercase italic tracking-tighter">Request <span className="text-glowearn-gold">Secured!</span></h2>
+              <p className="text-white/40 font-bold text-xs leading-relaxed uppercase tracking-widest">
+                Transfer pending verification.<br />Expected arrival: 24-72 hours.
               </p>
             </div>
             <button 
-              onClick={handleReset} 
-              className="text-glowearn-gold font-black uppercase tracking-[0.25em] text-[10px] hover:underline"
+              onClick={() => {
+                setStep('selection');
+                setWithdrawalDetail('');
+                setCoinsInput('0');
+              }} 
+              className="text-glowearn-gold font-black uppercase tracking-widest text-[10px] border-b border-glowearn-gold/30 pb-1"
             >
-              Return to Wallet
+              Return to Vault
             </button>
           </div>
         )}
