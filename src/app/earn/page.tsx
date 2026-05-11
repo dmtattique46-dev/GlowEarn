@@ -19,7 +19,6 @@ const ROWS = 8;
 const COLS = 8;
 const OFFSET_Y = 80;
 const SESSION_COIN_LIMIT = 200;
-const COINS_PER_LINE = 20;
 
 type BlockType = 0 | 1 | 2 | 3 | 4 | 5;
 type GameState = 'menu' | 'puzzle' | 'quick-solve' | 'watch-boost';
@@ -103,7 +102,7 @@ export default function EarnPage() {
 
       if (remaining > 0) {
         const timer = setInterval(() => {
-          setCooldownRemaining(prev => Math.max(0, prev - 1));
+          setOpenMobile => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
       }
@@ -317,8 +316,12 @@ export default function EarnPage() {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
         colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        // Reward Logic
-        const potentialReward = totalLines * COINS_PER_LINE;
+        // Random Reward Logic: 1 to 5 coins per line
+        let potentialReward = 0;
+        for (let i = 0; i < totalLines; i++) {
+          potentialReward += Math.floor(Math.random() * 5) + 1;
+        }
+
         const actualReward = (sessionCoins + potentialReward > SESSION_COIN_LIMIT) 
           ? Math.max(0, SESSION_COIN_LIMIT - sessionCoins) 
           : potentialReward;
@@ -402,7 +405,7 @@ export default function EarnPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
                   <div className="absolute bottom-4 left-6">
                     <h2 className="text-white font-headline font-black text-xl uppercase italic">Glow Block Puzzle</h2>
-                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">20 Coins per line • Limit 200</p>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">Random 1-5 Coins per line • Limit 200</p>
                   </div>
                 </div>
               </Card>
