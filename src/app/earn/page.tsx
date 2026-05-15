@@ -1,5 +1,4 @@
-
-"use client"
+'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Header } from '@/components/layout/Header';
@@ -102,7 +101,7 @@ export default function EarnPage() {
 
       if (remaining > 0) {
         const timer = setInterval(() => {
-          setOpenMobile => Math.max(0, prev - 1));
+          setCooldownRemaining(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
       }
