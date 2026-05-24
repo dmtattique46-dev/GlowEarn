@@ -51,10 +51,8 @@ export default function EarnPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Watch & Boost State
-  const [adTimer, setAdTimer] = useState<number>(0);
-  const [isAdLoading, setIsAdLoading] = useState(false);
   const AD_THRESHOLD = 1500;
-  const AD_URL = "https://www.highrevenuenetwork.com/your-smart-link-here"; // Adsterra Smart Link Placeholder
+  const AD_URL = "https://www.effectivecpmnetwork.com/ubpyi9ts?key=8cfe6aa0c3f81ee0a9fffba05e5e1492";
 
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -139,44 +137,31 @@ export default function EarnPage() {
     }
   };
 
-  // Watch & Boost Logic
+  // Watch & Boost Logic (Updated for Immediate Reward)
   const handleWatchAd = () => {
-    if (adTimer > 0) return;
-    
     window.open(AD_URL, '_blank');
-    setIsAdLoading(true);
     
-    // Admin bypass: shorter wait
-    const waitTime = isAdmin ? 3 : 15;
-    setAdTimer(waitTime);
-    
-    const timer = setInterval(() => {
-      setAdTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          completeAdWatch();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const completeAdWatch = () => {
     if (!userRef) return;
-    
+
+    // Immediate Reward: 10 Coins + 1 Ad Watch
+    const coinReward = 10;
+    const usdReward = (coinReward / 1000) * 0.50;
+
     updateDocumentNonBlocking(userRef, {
       adsWatched: increment(1),
+      coins: increment(coinReward),
+      usd: increment(usdReward),
       xp: increment(5),
       updatedAt: serverTimestamp()
     });
-    
-    setIsAdLoading(false);
-    setSuccessMessage('Ad Verified! +1 Progress Added');
+
+    setSuccessMessage('Ad Verified! +10 Coins Added');
+    setShowCoinsAnim(true);
     triggerHaptic([100, 50, 100]);
     
     setTimeout(() => {
       setSuccessMessage(null);
+      setShowCoinsAnim(false);
     }, 2000);
   };
 
@@ -447,7 +432,7 @@ export default function EarnPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0c2436] to-transparent" />
                   <div className="absolute bottom-4 left-6">
                     <h2 className="text-white font-headline font-black text-xl uppercase italic">Watch & Boost</h2>
-                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">Unlock Withdrawals</p>
+                    <p className="text-glowearn-gold text-[10px] font-bold uppercase tracking-widest">+10 Coins per Watch</p>
                   </div>
                 </div>
               </Card>
@@ -555,23 +540,20 @@ export default function EarnPage() {
               <div className="space-y-6">
                 <button 
                   onClick={handleWatchAd}
-                  disabled={adTimer > 0}
                   className={cn(
                     "w-full py-6 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex flex-col items-center justify-center gap-2",
-                    adTimer > 0 
-                      ? "bg-white/5 text-white/20 grayscale cursor-not-allowed" 
-                      : "shimmer-btn text-glowearn-navy shadow-[0_15px_40px_rgba(250,219,59,0.3)] active:scale-95"
+                    "shimmer-btn text-glowearn-navy shadow-[0_15px_40px_rgba(250,219,59,0.3)] active:scale-95"
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    {adTimer > 0 ? <Loader2 className="animate-spin" size={24} /> : <PlayCircle size={24} />}
-                    <span className="text-lg">{adTimer > 0 ? `Verifying... ${adTimer}s` : 'Watch Video Ad'}</span>
+                    <PlayCircle size={24} />
+                    <span className="text-lg">Watch Video Ad</span>
                   </div>
-                  {!adTimer && <span className="text-[10px] opacity-70">Opens Smart Link</span>}
+                  <span className="text-[10px] opacity-70">Opens Smart Link (+10 Coins)</span>
                 </button>
 
                 <p className="text-[10px] text-white/40 text-center font-bold uppercase leading-relaxed px-4">
-                  Stay on the page for 15 seconds after opening the link to verify your activity and earn progress.
+                  Each click earns you 10 coins and brings you closer to unlocking withdrawals!
                 </p>
               </div>
 
