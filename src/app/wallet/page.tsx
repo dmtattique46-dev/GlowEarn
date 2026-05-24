@@ -106,7 +106,7 @@ export default function WalletPage() {
     return withdrawalMethods.filter(m => isPakistan ? m.region === 'PK' : m.region === 'INT');
   }, [isAdmin, isPakistan]);
 
-  // Handle initial method selection
+  // Set default selection
   useEffect(() => {
     if (filteredMethods.length > 0 && !selectedMethod) {
       setSelectedMethod(filteredMethods[0].name);
@@ -148,7 +148,9 @@ export default function WalletPage() {
   const handleSubmitRequest = () => {
     if (!withdrawalDetail || !userRef || !firestore || !sessionUser) return;
     
-    if (actualBalance < rawInputCoins && !isAdmin) {
+    // Safety check again before submission
+    const currentActualBalance = userData?.coins ?? 0;
+    if (currentActualBalance < rawInputCoins && !isAdmin) {
        toast({
         title: "Insufficient Balance!",
         description: "Transaction failed. Please check your coin balance.",
@@ -176,7 +178,8 @@ export default function WalletPage() {
     addDocumentNonBlocking(withdrawRequestsRef, requestData);
 
     if (!isAdmin) {
-      // Ensuring it never goes negative by using Math.max logic in UI and strict increment subtraction
+      // Ensuring it never goes negative by checking balance locally before firing update
+      // Also using strict subtraction. If the user wants "seedha 0", they would withdraw their full amount.
       updateDocumentNonBlocking(userRef, { 
         coins: increment(-rawInputCoins),
         usd: increment(-(Number(usdValue)))

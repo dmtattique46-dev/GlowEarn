@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GlowEarn</string>
+    <string name="title_activity_main">GlowEarn</string>
+    <string name="package_name">com.glowearn.app</string>
+    <string name="custom_url_scheme">com.glowearn.app</string>
+</resources>

@@ -62,7 +62,6 @@ export default function EarnPage() {
       router.push('/auth/signup');
     } else {
       setSessionUser(JSON.parse(session));
-      resetGame();
     }
   }, [router]);
 
@@ -75,7 +74,6 @@ export default function EarnPage() {
 
   const isAdmin = userData?.isAdmin || sessionUser?.isAdmin;
 
-  // Sync Coins Logic (Rate: $0.50 per 1000 coins)
   const syncCoinsToFirestore = useCallback((coinReward: number) => {
     if (!userRef) return;
     const usdReward = (coinReward / 1000) * 0.50;
@@ -88,7 +86,6 @@ export default function EarnPage() {
     });
   }, [userRef]);
 
-  // Cooldown Logic for Quick Solve
   useEffect(() => {
     if (activeTab === 'quick-solve' && userData?.lastQuickPuzzleAt) {
       const lastSolve = new Date(userData.lastQuickPuzzleAt).getTime();
@@ -137,13 +134,11 @@ export default function EarnPage() {
     }
   };
 
-  // Watch & Boost Logic (Updated for Immediate Reward)
   const handleWatchAd = () => {
     window.open(AD_URL, '_blank');
     
     if (!userRef) return;
 
-    // Immediate Reward: 10 Coins + 1 Ad Watch
     const coinReward = 10;
     const usdReward = (coinReward / 1000) * 0.50;
 
@@ -165,14 +160,24 @@ export default function EarnPage() {
     }, 2000);
   };
 
-  // Block Puzzle Logic
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
     setScore(0);
     setSessionCoins(0);
     setIsGameOver(false);
-    refillShelf();
-  };
+    
+    const newShelf = [];
+    for (let i = 0; i < 3; i++) {
+      newShelf.push(SHAPES[Math.floor(Math.random() * SHAPES.length)]);
+    }
+    setShelf(newShelf);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'puzzle') {
+      resetGame();
+    }
+  }, [activeTab, resetGame]);
 
   const refillShelf = () => {
     const newShelf = [];
@@ -300,7 +305,6 @@ export default function EarnPage() {
         rowsToClear.forEach(ri => newGrid[ri].fill(0));
         colsToClear.forEach(ci => { for (let ri = 0; ri < ROWS; ri++) newGrid[ri][ci] = 0; });
         
-        // Random Reward Logic: 1 to 5 coins per line
         let potentialReward = 0;
         for (let i = 0; i < totalLines; i++) {
           potentialReward += Math.floor(Math.random() * 5) + 1;
