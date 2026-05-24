@@ -1,12 +1,11 @@
-
-"use client"
+'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { Lock, Unlock, ArrowRight, AlertCircle, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, PlayCircle, Info } from 'lucide-react';
+import { ArrowRight, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
@@ -90,14 +89,14 @@ export default function WalletPage() {
 
   const { data: userData } = useDoc(userRef);
 
-  const isAdmin = userData?.isAdmin || userData?.email === 'developerge@gmail.com' || sessionUser?.isAdmin;
-  const isPakistan = userData?.mobile?.startsWith('+92');
+  const isAdmin = userData?.isAdmin || userData?.email === 'developerge@gmail.com' || sessionUser?.isAdmin || sessionUser?.email === 'developerge@gmail.com';
+  const isPakistan = userData?.mobile?.startsWith('+92') || sessionUser?.mobile?.startsWith('+92');
 
   const withdrawalMethods: WithdrawalMethod[] = [
-    { name: "JazzCash", label: "(Mobile Wallet)", Logo: JazzCashLogo, inputLabel: "Enter JazzCash Mobile Number", placeholder: "03XX XXXXXXX", region: 'PK' },
-    { name: "EasyPaisa", label: "(Mobile Wallet)", Logo: EasyPaisaLogo, inputLabel: "Enter EasyPaisa Mobile Number", placeholder: "03XX XXXXXXX", region: 'PK' },
-    { name: "Bitcoin", label: "(Crypto)", Logo: BitcoinLogo, inputLabel: "Enter Bitcoin Wallet Address", placeholder: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", region: 'INT' },
-    { name: "Binance", label: "(Crypto)", Logo: BinanceLogo, inputLabel: "Enter Binance Pay ID / Email", placeholder: "ID or Email", region: 'INT' },
+    { name: "JazzCash", label: "(Local Wallet)", Logo: JazzCashLogo, inputLabel: "JazzCash Number", placeholder: "03XX XXXXXXX", region: 'PK' },
+    { name: "EasyPaisa", label: "(Local Wallet)", Logo: EasyPaisaLogo, inputLabel: "EasyPaisa Number", placeholder: "03XX XXXXXXX", region: 'PK' },
+    { name: "Binance", label: "(USDT/Crypto)", Logo: BinanceLogo, inputLabel: "Binance Pay ID / Email", placeholder: "Enter ID or Email", region: 'INT' },
+    { name: "Bitcoin", label: "(BTC/Crypto)", Logo: BitcoinLogo, inputLabel: "Bitcoin Wallet Address", placeholder: "1A1zP1eP...", region: 'INT' },
   ];
 
   const filteredMethods = useMemo(() => {
@@ -105,7 +104,7 @@ export default function WalletPage() {
     return withdrawalMethods.filter(m => isPakistan ? m.region === 'PK' : m.region === 'INT');
   }, [isAdmin, isPakistan]);
 
-  // Default selection
+  // Handle initial method selection
   useEffect(() => {
     if (filteredMethods.length > 0 && !selectedMethod) {
       setSelectedMethod(filteredMethods[0].name);
@@ -125,27 +124,20 @@ export default function WalletPage() {
   const isAdsMet = adsWatched >= AD_THRESHOLD;
   const hasEnoughCoins = rawInputCoins <= actualBalance;
   const hasMinCoins = rawInputCoins >= 1000;
-  const canWithdraw = (isAdmin) || (isAdsMet && hasEnoughCoins && hasMinCoins);
+  const canWithdraw = isAdmin || (isAdsMet && hasEnoughCoins && hasMinCoins);
 
   const handleCoinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "");
     setCoinsInput(val.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
   };
 
-  const playSfx = (url: string) => {
-    const audio = new Audio(url);
-    audio.play().catch(() => {});
-  };
-
   const handleProceedToDetails = () => {
-    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('details');
   };
 
   const handleSubmitRequest = () => {
     if (!withdrawalDetail || !userRef || !firestore || !sessionUser) return;
     
-    playSfx('https://www.soundjay.com/buttons/sounds/button-16.mp3');
     setStep('processing');
     
     const withdrawRequestsRef = collection(firestore, 'WithdrawRequests');
@@ -171,7 +163,6 @@ export default function WalletPage() {
     }
 
     setTimeout(() => {
-      playSfx('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
       setStep('success');
     }, 2500);
   };
@@ -262,15 +253,11 @@ export default function WalletPage() {
                       placeholder="0"
                     />
                   </div>
-                  {rawInputCoins > 0 && !hasEnoughCoins && !isAdmin && (
-                    <p className="text-red-500 text-[10px] font-bold uppercase text-center">Insufficient Balance</p>
-                  )}
                 </div>
 
                 <div className="flex flex-col items-center justify-center py-2 relative">
-                  <ArrowRight className="text-glowearn-gold/20 rotate-90 mb-4" size={24} />
                   <div className={cn(
-                    "px-8 py-5 rounded-[2rem] border flex flex-col items-center w-full text-center relative",
+                    "px-8 py-5 rounded-[2rem] border flex flex-col items-center w-full text-center relative transition-all duration-300",
                     canWithdraw ? "bg-glowearn-gold/10 border-glowearn-gold/30" : "bg-white/5 border-white/5"
                   )}>
                     <span className={cn(
