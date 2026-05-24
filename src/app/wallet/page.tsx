@@ -5,13 +5,14 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingElements } from '@/components/background/FloatingElements';
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, PlayCircle } from 'lucide-react';
+import { ArrowRight, ChevronLeft, CheckCircle2, Loader2, Send, ShieldCheck, PlayCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoldenInput } from '@/components/ui/GoldenInput';
 import { GoldenButton } from '@/components/ui/GoldenButton';
 import { Progress } from "@/components/ui/progress";
 import { useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { doc, increment, collection, serverTimestamp } from 'firebase/firestore';
+import { useToast } from "@/hooks/use-toast";
 
 // --- Payment Method Logos ---
 
@@ -66,6 +67,7 @@ interface WithdrawalMethod {
 
 export default function WalletPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [coinsInput, setCoinsInput] = useState<string>("0");
   const [selectedMethod, setSelectedMethod] = useState<string>("");
@@ -132,12 +134,30 @@ export default function WalletPage() {
   };
 
   const handleProceedToDetails = () => {
+    if (actualBalance < rawInputCoins && !isAdmin) {
+      toast({
+        title: "Insufficient Balance!",
+        description: "You cannot withdraw more than your current balance.",
+        variant: "destructive",
+      });
+      return;
+    }
     setStep('details');
   };
 
   const handleSubmitRequest = () => {
     if (!withdrawalDetail || !userRef || !firestore || !sessionUser) return;
     
+    if (actualBalance < rawInputCoins && !isAdmin) {
+       toast({
+        title: "Insufficient Balance!",
+        description: "Transaction failed. Please check your coin balance.",
+        variant: "destructive",
+      });
+      setStep('selection');
+      return;
+    }
+
     setStep('processing');
     
     const withdrawRequestsRef = collection(firestore, 'WithdrawRequests');
@@ -156,6 +176,7 @@ export default function WalletPage() {
     addDocumentNonBlocking(withdrawRequestsRef, requestData);
 
     if (!isAdmin) {
+      // Ensuring it never goes negative by using Math.max logic in UI and strict increment subtraction
       updateDocumentNonBlocking(userRef, { 
         coins: increment(-rawInputCoins),
         usd: increment(-(Number(usdValue)))
@@ -253,6 +274,11 @@ export default function WalletPage() {
                       placeholder="0"
                     />
                   </div>
+                  {!hasEnoughCoins && !isAdmin && (
+                    <p className="text-red-500 text-[10px] font-black uppercase text-center mt-2 flex items-center justify-center gap-1">
+                      <AlertCircle size={12} /> Insufficient Balance!
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-center justify-center py-2 relative">
